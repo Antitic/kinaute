@@ -48,7 +48,7 @@ diaporama avec 9 transitions ; récupération automatique ; clair/sombre selon l
 - Texte vertical, colonnes multiples, texte contour/dégradé, soulignement/barré affichés, couleurs de surlignage, exposant/indice (taille seulement).
 - Polices : aucune n'est embarquée ; les polices incorporées au `.pptx` sont conservées mais pas utilisées pour l'affichage.
 - Tableaux : styles de tableau intégrés approximés (en-tête + lignes alternées) ; hauteur de ligne non recalculée selon le texte.
-- Formes prédéfinies : ~55 dessinées ; les autres sont dessinées en rectangle. Formes libres (`custGeom`) : prises en charge avec leurs formules.
+- Formes prédéfinies : 61 reconnues, dont ~44 dessinées fidèlement et ~17 **approximées** (rectangle, rectangle arrondi ou ellipse : coins coupés, bulles, cadres, arcs…). Les ~140 autres formes de PowerPoint sont dessinées en rectangle. Formes libres (`custGeom`) : prises en charge avec leurs formules.
 
 **Édition**
 - **Saisie de texte directement sur le canevas** : aujourd'hui dans l'inspecteur (onglet Texte). Pas de sélection partielle de texte (le style
