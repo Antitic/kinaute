@@ -1,0 +1,16 @@
+[package]
+name = "kinaute-render"
+description = "CPU slide renderer (tiny-skia + cosmic-text)"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+kinaute-model.workspace = true
+tiny-skia.workspace = true
+cosmic-text.workspace = true
+image.workspace = true
+tracing.workspace = true
+
+[lints]
+workspace = true

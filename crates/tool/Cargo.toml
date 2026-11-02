@@ -12,6 +12,7 @@ path = "src/main.rs"
 [dependencies]
 kinaute-model.workspace = true
 kinaute-pptx.workspace = true
+kinaute-render.workspace = true
 
 [lints]
 workspace = true

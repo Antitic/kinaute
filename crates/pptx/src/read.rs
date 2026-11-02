@@ -571,7 +571,7 @@ pub fn shape_of(el: &Element, rd: &Rd) -> Shape {
                 hidden,
                 ph,
                 xfrm: el.child("xfrm").map(xfrm_of),
-                kind: ShapeKind::Frame(Box::new(FrameProps { content, fallback: None })),
+                kind: ShapeKind::Frame(Box::new(FrameProps { content, drawing: Vec::new() })),
                 source: src,
             }
         }
@@ -593,6 +593,44 @@ pub fn tree_shapes(tree: &Element, rd: &Rd) -> Vec<Shape> {
         .filter(|e| !matches!(e.local(), "nvGrpSpPr" | "grpSpPr" | "extLst"))
         .map(|e| shape_of(e, rd))
         .collect()
+}
+
+fn find_desc<'a>(e: &'a Element, local: &str) -> Option<&'a Element> {
+    if e.local() == local {
+        return Some(e);
+    }
+    e.elements().find_map(|c| find_desc(c, local))
+}
+
+/// Load the pre-rendered drawing of a SmartArt frame.
+fn load_drawing(pkg: &Package, rels: &[Rel], frame: &Element) -> Vec<Shape> {
+    let by_id = |id: &str| rels.iter().find(|r| r.id == id).map(|r| r.target.clone());
+    let from_model = frame
+        .path(&["graphic", "graphicData", "relIds"])
+        .and_then(|r| r.attr_local("dm"))
+        .and_then(by_id)
+        .and_then(|dm| pkg.xml(&dm).ok())
+        .and_then(|d| find_desc(&d.root, "dataModelExt").and_then(|e| e.attr("relId").map(str::to_string)))
+        .and_then(|id| by_id(&id));
+    let part = from_model.or_else(|| rels.iter().find(|r| r.ty.ends_with("/diagramDrawing")).map(|r| r.target.clone()));
+    let Some(part) = part else { return Vec::new() };
+    let Ok(doc) = pkg.xml(&part) else { return Vec::new() };
+    let drels = pkg.rels_of(&part);
+    doc.root.child("spTree").map(|t| tree_shapes(t, &Rd { rels: &drels })).unwrap_or_default()
+}
+
+fn attach_diagrams(pkg: &Package, rels: &[Rel], shapes: &mut [Shape]) {
+    for s in shapes {
+        match &mut s.kind {
+            ShapeKind::Group(g) => attach_diagrams(pkg, rels, &mut g.shapes),
+            ShapeKind::Frame(f) if matches!(f.content, FrameContent::Diagram) => {
+                if let Some(src) = &s.source {
+                    f.drawing = load_drawing(pkg, rels, src);
+                }
+            }
+            _ => {}
+        }
+    }
 }
 
 pub fn background_of(csld: &Element, rd: &Rd) -> Option<Background> {
@@ -871,11 +909,12 @@ pub fn open(bytes: &[u8]) -> Result<Opened, PptxError> {
                 .collect();
             Some(texts.join("\n")).filter(|t| !t.is_empty())
         });
-        let shapes = csld.and_then(|c| c.child("spTree")).map(|t| tree_shapes(t, &srd)).unwrap_or_default();
+        let mut shapes = csld.and_then(|c| c.child("spTree")).map(|t| tree_shapes(t, &srd)).unwrap_or_default();
+        attach_diagrams(&package, &srels, &mut shapes);
         for s in &shapes {
             if let ShapeKind::Frame(f) = &s.kind {
                 match &f.content {
-                    FrameContent::Diagram => report.push(format!("`{spart}`: SmartArt `{}` kept as-is (not drawn)", s.name)),
+                    FrameContent::Diagram if f.drawing.is_empty() => report.push(format!("`{spart}`: SmartArt `{}` kept as-is (no drawing to display)", s.name)),
                     FrameContent::Ole => report.push(format!("`{spart}`: embedded object `{}` kept as-is", s.name)),
                     _ => {}
                 }

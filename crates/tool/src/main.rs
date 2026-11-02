@@ -129,6 +129,27 @@ fn demo_edit(path: &str, out: &str) -> Result<(), String> {
     std::fs::write(out, saved).map_err(|e| e.to_string())
 }
 
+/// Render every slide to PNG files `OUT/NN.png`.
+fn render(path: &str, out: &str, width: u32) -> Result<(), String> {
+    let bytes = std::fs::read(path).map_err(|e| e.to_string())?;
+    let doc = kinaute_pptx::open(&bytes).map_err(|e| e.to_string())?;
+    std::fs::create_dir_all(out).map_err(|e| e.to_string())?;
+    let mut r = kinaute_render::Renderer::new();
+    let pres = doc.pres();
+    r.set_media(pres.media.clone());
+    let t0 = std::time::Instant::now();
+    for i in 0..pres.slides.len() {
+        if std::env::var_os("KINAUTE_TRACE").is_some() {
+            eprintln!("slide {}", i + 1);
+        }
+        let pm = r.render_slide(pres, i, width).ok_or("render failed")?;
+        let png = kinaute_render::to_png(&pm).ok_or("png failed")?;
+        std::fs::write(format!("{out}/{:02}.png", i + 1), png).map_err(|e| e.to_string())?;
+    }
+    eprintln!("{path}: {} slides rendered in {:?}", pres.slides.len(), t0.elapsed());
+    Ok(())
+}
+
 fn main() -> ExitCode {
     let args: Vec<String> = std::env::args().collect();
     let Some(cmd) = args.get(1) else {
@@ -153,6 +174,13 @@ fn main() -> ExitCode {
         }
         "demo-edit" if args.len() == 4 => {
             if let Err(e) = demo_edit(&args[2], &args[3]) {
+                eprintln!("{}: FAIL {e}", args[2]);
+                failed += 1;
+            }
+        }
+        "render" if args.len() >= 4 => {
+            let w = args.get(4).and_then(|v| v.parse().ok()).unwrap_or(960);
+            if let Err(e) = render(&args[2], &args[3], w) {
                 eprintln!("{}: FAIL {e}", args[2]);
                 failed += 1;
             }

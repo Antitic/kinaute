@@ -469,8 +469,9 @@ pub enum FrameContent {
 #[derive(Debug, Clone, PartialEq)]
 pub struct FrameProps {
     pub content: FrameContent,
-    /// Fallback picture for rendering content Kinaute cannot draw natively.
-    pub fallback: Option<String>,
+    /// Pre-rendered shapes (SmartArt drawing part) in the frame's local
+    /// coordinates, used for display only.
+    pub drawing: Vec<Shape>,
 }
 
 #[derive(Debug, Clone, PartialEq)]

@@ -162,6 +162,20 @@ impl<'a> Ctx<'a> {
                 push_list(&mut chain, &t.list_style, lvl);
             }
         }
+        // The shape style's font reference (`p:style/fontRef`) outranks the
+        // master and presentation defaults but not explicit formatting.
+        let mut style_pp = ParaProps::default();
+        if let Some(st) = shape.sp().and_then(|s| s.style.as_ref()) {
+            if let Some(c) = &st.font.1 {
+                style_pp.def_run.fill = Some(Fill::Solid(c.clone()));
+            }
+            match st.font.0.as_str() {
+                "major" => style_pp.def_run.font = Some("+mj-lt".into()),
+                "minor" => style_pp.def_run.font = Some("+mn-lt".into()),
+                _ => {}
+            }
+        }
+        chain.push(&style_pp);
         if let Some(ls) = self.master_style(shape) {
             push_list(&mut chain, ls, lvl);
         }
@@ -171,21 +185,6 @@ impl<'a> Ctx<'a> {
         let mut out = ParaProps::default();
         for p in chain {
             out.inherit(p);
-        }
-        // Theme font colour/face from the shape style (`fontRef`).
-        if let Some(st) = shape.sp().and_then(|s| s.style.as_ref()) {
-            if out.def_run.fill.is_none() {
-                if let Some(c) = &st.font.1 {
-                    out.def_run.fill = Some(Fill::Solid(c.clone()));
-                }
-            }
-            if out.def_run.font.is_none() {
-                match st.font.0.as_str() {
-                    "major" => out.def_run.font = Some("+mj-lt".into()),
-                    "minor" => out.def_run.font = Some("+mn-lt".into()),
-                    _ => {}
-                }
-            }
         }
         out
     }
