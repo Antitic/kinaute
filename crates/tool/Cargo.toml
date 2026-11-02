@@ -1,0 +1,17 @@
+[package]
+name = "kinaute-tool"
+description = "Command-line tool for inspecting and round-tripping presentations"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[[bin]]
+name = "kinaute-tool"
+path = "src/main.rs"
+
+[dependencies]
+kinaute-model.workspace = true
+kinaute-pptx.workspace = true
+
+[lints]
+workspace = true

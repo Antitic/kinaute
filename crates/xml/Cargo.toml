@@ -1,0 +1,13 @@
+[package]
+name = "kinaute-xml"
+description = "Lossless XML tree used by Kinaute's OOXML reader/writer"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+quick-xml.workspace = true
+thiserror.workspace = true
+
+[lints]
+workspace = true

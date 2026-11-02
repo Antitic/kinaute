@@ -1,0 +1,12 @@
+[package]
+name = "kinaute-model"
+description = "Kinaute document model: presentations, slides, shapes, text, styles, undo/redo"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+kinaute-xml.workspace = true
+
+[lints]
+workspace = true

@@ -1,0 +1,16 @@
+[package]
+name = "kinaute-pptx"
+description = "Lossless .pptx reader and writer for Kinaute"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+kinaute-xml.workspace = true
+kinaute-model.workspace = true
+zip.workspace = true
+thiserror.workspace = true
+tracing.workspace = true
+
+[lints]
+workspace = true
