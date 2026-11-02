@@ -1,3 +1,4 @@
+#![cfg_attr(test, allow(clippy::expect_used))]
 //! Minimal PDF writer: one JPEG image per page (slides are rasterised).
 
 use std::io::Write;
@@ -21,7 +22,7 @@ pub fn write_pdf(pages: &[Page], page_w_pt: f32, page_h_pt: f32, title: &str) ->
             offsets.push(0);
         }
         offsets[id - 1] = out.len();
-        let _ = write!(out, "{id} 0 obj\n");
+        let _ = writeln!(out, "{id} 0 obj");
         let _ = out.write_all(body);
         let _ = out.write_all(b"\nendobj\n");
     };
@@ -42,7 +43,12 @@ pub fn write_pdf(pages: &[Page], page_w_pt: f32, page_h_pt: f32, title: &str) ->
             .as_bytes(),
         );
         let content = format!("q {page_w_pt:.2} 0 0 {page_h_pt:.2} 0 0 cm /Im0 Do Q");
-        obj(&mut out, &mut offsets, ct, format!("<< /Length {} >>\nstream\n{content}\nendstream", content.len()).as_bytes());
+        obj(
+            &mut out,
+            &mut offsets,
+            ct,
+            format!("<< /Length {} >>\nstream\n{content}\nendstream", content.len()).as_bytes(),
+        );
         let mut body = format!(
             "<< /Type /XObject /Subtype /Image /Width {} /Height {} /ColorSpace /DeviceRGB /BitsPerComponent 8 /Filter /DCTDecode /Length {} >>\nstream\n",
             p.width_px,
@@ -56,11 +62,11 @@ pub fn write_pdf(pages: &[Page], page_w_pt: f32, page_h_pt: f32, title: &str) ->
     }
     let xref = out.len();
     let total = offsets.len() + 1;
-    let _ = write!(out, "xref\n0 {total}\n0000000000 65535 f \n");
+    let _ = writeln!(out, "xref\n0 {total}\n0000000000 65535 f ");
     for o in &offsets {
-        let _ = write!(out, "{o:010} 00000 n \n");
+        let _ = writeln!(out, "{o:010} 00000 n ");
     }
-    let _ = write!(out, "trailer\n<< /Size {total} /Root 1 0 R /Info 3 0 R >>\nstartxref\n{xref}\n%%EOF\n");
+    let _ = writeln!(out, "trailer\n<< /Size {total} /Root 1 0 R /Info 3 0 R >>\nstartxref\n{xref}\n%%EOF");
     out
 }
 

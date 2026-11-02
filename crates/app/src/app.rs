@@ -93,6 +93,9 @@ pub struct App {
     pub cursor_handle: Option<Handle>,
 }
 
+/// Axis-aligned bounds (left, top, right, bottom).
+type Bounds = (f64, f64, f64, f64);
+
 /// Copy an opaque pixmap into `dst` at (ox, oy), row by row (no blending).
 fn blit_opaque(dst: &mut Pixmap, src: &Pixmap, ox: i32, oy: i32) {
     let (dw, dh) = (dst.width() as i32, dst.height() as i32);
@@ -221,7 +224,9 @@ impl App {
         let rev = self.doc.history.revision();
         // While dragging, only the moving objects are redrawn.
         let layered = match &self.drag {
-            Some(Drag::Move { moved: true, .. }) | Some(Drag::Resize { .. }) | Some(Drag::Rotate { .. }) if !self.sel.is_empty() => {
+            Some(Drag::Move { moved: true, .. }) | Some(Drag::Resize { .. }) | Some(Drag::Rotate { .. })
+                if !self.sel.is_empty() =>
+            {
                 let ids = self.sel.clone();
                 self.render_layered(width, &ids)
             }
@@ -230,7 +235,8 @@ impl App {
                 None
             }
         };
-        let stale = layered.is_none() && !matches!(&self.cache, Some(c) if c.revision == rev && c.slide == self.cur && c.width == width);
+        let stale = layered.is_none()
+            && !matches!(&self.cache, Some(c) if c.revision == rev && c.slide == self.cur && c.width == width);
         if stale {
             let pres = self.doc.history.current().clone();
             self.renderer.borrow_mut().show_prompts = true;
@@ -242,7 +248,12 @@ impl App {
         let mut p = Paint::default();
         p.set_color_rgba8(0, 0, 0, 70);
         for i in 1..=4 {
-            if let Some(r) = tiny_skia::Rect::from_xywh(ox - i as f32 + 1.0, oy + i as f32 * 1.5, sw + (i * 2) as f32 - 2.0, sh + 1.0) {
+            if let Some(r) = tiny_skia::Rect::from_xywh(
+                ox - i as f32 + 1.0,
+                oy + i as f32 * 1.5,
+                sw + (i * 2) as f32 - 2.0,
+                sh + 1.0,
+            ) {
                 let mut pb = PathBuilder::new();
                 pb.push_rect(r);
                 if let Some(path) = pb.finish() {
@@ -291,7 +302,8 @@ impl App {
         }
         let pad = 56;
         let (x0, y0) = (((bb.0 * k) as i32 - pad).max(0), ((bb.1 * k) as i32 - pad).max(0));
-        let (x1, y1) = (((bb.2 * k) as i32 + pad).min(out.width() as i32), ((bb.3 * k) as i32 + pad).min(out.height() as i32));
+        let (x1, y1) =
+            (((bb.2 * k) as i32 + pad).min(out.width() as i32), ((bb.3 * k) as i32 + pad).min(out.height() as i32));
         if x1 > x0 && y1 > y0 {
             if let Some(rect) = tiny_skia::IntRect::from_xywh(x0, y0, (x1 - x0) as u32, (y1 - y0) as u32) {
                 let paint = PixmapPaint::default();
@@ -374,12 +386,21 @@ impl App {
             if let Some(x) = self.eff_xfrm(self.sel[0]) {
                 let hp = self.handle_points(&x);
                 // Rotation stem.
-                if let (Some((_, top)), Some((_, rot))) = (hp.iter().find(|(h, _)| *h == Handle::Resize(0, -1)), hp.iter().find(|(h, _)| *h == Handle::Rotate)) {
+                if let (Some((_, top)), Some((_, rot))) = (
+                    hp.iter().find(|(h, _)| *h == Handle::Resize(0, -1)),
+                    hp.iter().find(|(h, _)| *h == Handle::Rotate),
+                ) {
                     let mut pb = PathBuilder::new();
                     pb.move_to(top.0, top.1);
                     pb.line_to(rot.0, rot.1);
                     if let Some(p) = pb.finish() {
-                        out.stroke_path(&p, &blue, &Stroke { width: 1.0, ..Default::default() }, Transform::identity(), None);
+                        out.stroke_path(
+                            &p,
+                            &blue,
+                            &Stroke { width: 1.0, ..Default::default() },
+                            Transform::identity(),
+                            None,
+                        );
                     }
                 }
                 stroke.width = 1.5;
@@ -389,7 +410,9 @@ impl App {
                         if let Some(r) = tiny_skia::Rect::from_xywh(px - 5.0, py - 5.0, 10.0, 10.0) {
                             pb.push_oval(r);
                         }
-                    } else if let Some(r) = tiny_skia::Rect::from_xywh(px - HANDLE_PX / 2.0, py - HANDLE_PX / 2.0, HANDLE_PX, HANDLE_PX) {
+                    } else if let Some(r) =
+                        tiny_skia::Rect::from_xywh(px - HANDLE_PX / 2.0, py - HANDLE_PX / 2.0, HANDLE_PX, HANDLE_PX)
+                    {
                         pb.push_rect(r);
                     }
                     if let Some(p) = pb.finish() {
@@ -433,7 +456,13 @@ impl App {
                     let mut f = Paint::default();
                     f.set_color_rgba8(ACCENT.0, ACCENT.1, ACCENT.2, 40);
                     out.fill_path(&p, &f, FillRule::Winding, Transform::identity(), None);
-                    out.stroke_path(&p, &blue, &Stroke { width: 1.0, ..Default::default() }, Transform::identity(), None);
+                    out.stroke_path(
+                        &p,
+                        &blue,
+                        &Stroke { width: 1.0, ..Default::default() },
+                        Transform::identity(),
+                        None,
+                    );
                 }
             }
         }
@@ -456,7 +485,8 @@ impl App {
         } else if self.cur >= n {
             self.cur = n - 1;
         }
-        let alive: Vec<u32> = self.pres().slides.get(self.cur).map(|s| s.shapes.iter().map(|x| x.id).collect()).unwrap_or_default();
+        let alive: Vec<u32> =
+            self.pres().slides.get(self.cur).map(|s| s.shapes.iter().map(|x| x.id).collect()).unwrap_or_default();
         self.sel.retain(|id| alive.contains(id));
     }
 
@@ -529,7 +559,8 @@ impl App {
                 } else if !self.sel.contains(&id) {
                     self.sel = vec![id];
                 }
-                let orig: Vec<(u32, Xfrm)> = self.sel.iter().filter_map(|i| self.eff_xfrm(*i).map(|x| (*i, x))).collect();
+                let orig: Vec<(u32, Xfrm)> =
+                    self.sel.iter().filter_map(|i| self.eff_xfrm(*i).map(|x| (*i, x))).collect();
                 if !orig.is_empty() {
                     self.drag = Some(Drag::Move { start: (ex, ey), orig, moved: false });
                 }
@@ -635,7 +666,11 @@ impl App {
                 }
                 if shift {
                     // Constrain to an axis.
-                    if dx.abs() > dy.abs() { dy = 0.0 } else { dx = 0.0 }
+                    if dx.abs() > dy.abs() {
+                        dy = 0.0
+                    } else {
+                        dx = 0.0
+                    }
                 }
                 // Union bounding box of the originals, moved.
                 let mut b = (f64::MAX, f64::MAX, f64::MIN, f64::MIN);
@@ -647,7 +682,10 @@ impl App {
                 let ids: Vec<u32> = orig.iter().map(|(i, _)| *i).collect();
                 let (sx, sy) = self.snap(moved_box, &ids, &[0, 1, 2], &[0, 1, 2]);
                 let (dx, dy) = (dx + sx, dy + sy);
-                let items: Vec<(u32, Xfrm)> = orig.iter().map(|(i, x)| (*i, Xfrm { x: x.x + dx.round() as i64, y: x.y + dy.round() as i64, ..*x })).collect();
+                let items: Vec<(u32, Xfrm)> = orig
+                    .iter()
+                    .map(|(i, x)| (*i, Xfrm { x: x.x + dx.round() as i64, y: x.y + dy.round() as i64, ..*x }))
+                    .collect();
                 self.apply_drag(Command::SetXfrm { slide: self.cur, items });
                 self.drag = Some(Drag::Move { start, orig, moved: true });
             }
@@ -675,16 +713,34 @@ impl App {
                     let left = if hx < 0 { l + w - nw } else { l };
                     let top = if hy < 0 { t + h - nh } else { t };
                     let bx = (left, top, left + nw, top + nh);
-                    let ex_idx: Vec<usize> = match hx { -1 => vec![0], 1 => vec![2], _ => vec![] };
-                    let ey_idx: Vec<usize> = match hy { -1 => vec![0], 1 => vec![2], _ => vec![] };
+                    let ex_idx: Vec<usize> = match hx {
+                        -1 => vec![0],
+                        1 => vec![2],
+                        _ => vec![],
+                    };
+                    let ey_idx: Vec<usize> = match hy {
+                        -1 => vec![0],
+                        1 => vec![2],
+                        _ => vec![],
+                    };
                     let (sx, sy) = self.snap(bx, &[id], &ex_idx, &ey_idx);
-                    if hx != 0 { nw = (nw + sx * hx as f64).max(min); }
-                    if hy != 0 { nh = (nh + sy * hy as f64).max(min); }
+                    if hx != 0 {
+                        nw = (nw + sx * hx as f64).max(min);
+                    }
+                    if hy != 0 {
+                        nh = (nh + sy * hy as f64).max(min);
+                    }
                 }
                 let (offx, offy) = rot_pt(ax + hx as f64 * nw / 2.0, ay + hy as f64 * nh / 2.0, a);
                 let (anx, any) = rot_pt(ax, ay, a);
                 let (ncx, ncy) = (cx + anx + (offx - anx), cy + any + (offy - any));
-                let nx = Xfrm { x: (ncx - nw / 2.0).round() as i64, y: (ncy - nh / 2.0).round() as i64, w: nw.round() as i64, h: nh.round() as i64, ..orig };
+                let nx = Xfrm {
+                    x: (ncx - nw / 2.0).round() as i64,
+                    y: (ncy - nh / 2.0).round() as i64,
+                    w: nw.round() as i64,
+                    h: nh.round() as i64,
+                    ..orig
+                };
                 self.apply_drag(Command::SetXfrm { slide: self.cur, items: vec![(id, nx)] });
             }
             Drag::Rotate { id, orig } => {
@@ -745,7 +801,12 @@ impl App {
             w = dw;
             h = dh;
         }
-        let xf = Xfrm::new(x.round() as i64, y.round() as i64, w.round() as i64, h.round().max(if tool == "line" { 0.0 } else { 1.0 }) as i64);
+        let xf = Xfrm::new(
+            x.round() as i64,
+            y.round() as i64,
+            w.round() as i64,
+            h.round().max(if tool == "line" { 0.0 } else { 1.0 }) as i64,
+        );
         let shape = match tool.as_str() {
             "text" => new::text_box(0, xf, "Texte", 2400),
             "line" => new::line(0, xf),
@@ -835,7 +896,9 @@ impl App {
         let items: Vec<(u32, Xfrm)> = self
             .sel
             .iter()
-            .filter_map(|id| self.eff_xfrm(*id).map(|x| (*id, Xfrm { x: x.x + dx.round() as i64, y: x.y + dy.round() as i64, ..x })))
+            .filter_map(|id| {
+                self.eff_xfrm(*id).map(|x| (*id, Xfrm { x: x.x + dx.round() as i64, y: x.y + dy.round() as i64, ..x }))
+            })
             .collect();
         if !items.is_empty() {
             self.drag_key = self.drag_key.wrapping_add(1).max(1);
@@ -844,7 +907,14 @@ impl App {
         }
     }
 
-    pub fn set_xfrm_of_selection(&mut self, x: Option<f64>, y: Option<f64>, w: Option<f64>, h: Option<f64>, rot: Option<f64>) {
+    pub fn set_xfrm_of_selection(
+        &mut self,
+        x: Option<f64>,
+        y: Option<f64>,
+        w: Option<f64>,
+        h: Option<f64>,
+        rot: Option<f64>,
+    ) {
         let Some(&id) = self.sel.first() else { return };
         let Some(cur) = self.eff_xfrm(id) else { return };
         let nx = Xfrm {
@@ -883,7 +953,13 @@ impl App {
                         .shapes()
                         .iter()
                         .find(|s| s.id == id)
-                        .and_then(|s| if let ShapeKind::Group(g) = &s.kind { Some(g.shapes.iter().map(|c| c.id).collect()) } else { None })
+                        .and_then(|s| {
+                            if let ShapeKind::Group(g) = &s.kind {
+                                Some(g.shapes.iter().map(|c| c.id).collect())
+                            } else {
+                                None
+                            }
+                        })
                         .unwrap_or_default();
                     self.run(Command::Ungroup { slide, id });
                     self.sel = kids;
@@ -912,7 +988,7 @@ impl App {
         let mut out: Vec<(u32, Xfrm)> = Vec::new();
         if what == "dh" || what == "dv" {
             let horiz = what == "dh";
-            let mut v: Vec<(u32, Xfrm, (f64, f64, f64, f64))> = items.iter().map(|(i, x)| (*i, *x, bounds(x))).collect();
+            let mut v: Vec<(u32, Xfrm, Bounds)> = items.iter().map(|(i, x)| (*i, *x, bounds(x))).collect();
             v.sort_by(|a, b| {
                 let (ka, kb) = if horiz { (a.2 .0, b.2 .0) } else { (a.2 .1, b.2 .1) };
                 ka.partial_cmp(&kb).unwrap_or(std::cmp::Ordering::Equal)
@@ -924,7 +1000,11 @@ impl App {
             for (id, x, bb) in v {
                 let size = if horiz { bb.2 - bb.0 } else { bb.3 - bb.1 };
                 let delta = pos - if horiz { bb.0 } else { bb.1 };
-                let nx = if horiz { Xfrm { x: x.x + delta.round() as i64, ..x } } else { Xfrm { y: x.y + delta.round() as i64, ..x } };
+                let nx = if horiz {
+                    Xfrm { x: x.x + delta.round() as i64, ..x }
+                } else {
+                    Xfrm { y: x.y + delta.round() as i64, ..x }
+                };
                 out.push((id, nx));
                 pos += size + gap;
             }
@@ -940,7 +1020,10 @@ impl App {
                     "am" => (bb.0, (t + b) / 2.0 - h / 2.0),
                     _ => (bb.0, b - h),
                 };
-                out.push((*id, Xfrm { x: x.x + (nl - bb.0).round() as i64, y: x.y + (nt - bb.1).round() as i64, ..*x }));
+                out.push((
+                    *id,
+                    Xfrm { x: x.x + (nl - bb.0).round() as i64, y: x.y + (nt - bb.1).round() as i64, ..*x },
+                ));
             }
         }
         self.run(Command::SetXfrm { slide: self.cur, items: out });
@@ -960,10 +1043,18 @@ impl App {
         let cur = self.sel_info().line;
         let width = width_pt.or(cur.map(|l| l.1)).unwrap_or(1.0);
         let line = match c {
-            Some([r, g, b]) => Line { width: Some((width * EMU_PT) as i64), fill: Some(Fill::Solid(Color::srgb(&Rgba::from_u8(r, g, b).to_hex()))), ..Default::default() },
+            Some([r, g, b]) => Line {
+                width: Some((width * EMU_PT) as i64),
+                fill: Some(Fill::Solid(Color::srgb(&Rgba::from_u8(r, g, b).to_hex()))),
+                ..Default::default()
+            },
             None if width_pt.is_some() && cur.is_some() => {
                 let rgb = cur.map(|l| l.0).unwrap_or([0, 0, 0, 255]);
-                Line { width: Some((width * EMU_PT) as i64), fill: Some(Fill::Solid(Color::srgb(&Rgba::from_u8(rgb[0], rgb[1], rgb[2]).to_hex()))), ..Default::default() }
+                Line {
+                    width: Some((width * EMU_PT) as i64),
+                    fill: Some(Fill::Solid(Color::srgb(&Rgba::from_u8(rgb[0], rgb[1], rgb[2]).to_hex()))),
+                    ..Default::default()
+                }
             }
             None => Line { fill: Some(Fill::None), ..Default::default() },
         };
@@ -972,7 +1063,10 @@ impl App {
 
     pub fn set_text(&mut self, id: u32, text: &str) {
         let key = 0x2000_0000 + id as u64;
-        let _ = self.doc.history.apply_coalesced(Command::SetText { slide: self.cur, id, text: text.to_string() }, Some(key));
+        let _ = self
+            .doc
+            .history
+            .apply_coalesced(Command::SetText { slide: self.cur, id, text: text.to_string() }, Some(key));
     }
 
     pub fn patch_run(&mut self, patch: RunPatch) {
@@ -1023,7 +1117,9 @@ impl App {
         let cur_layout = p.slides.get(self.cur).map(|s| s.layout).unwrap_or(0);
         // After a title slide, default to a content layout.
         let layout_idx = match p.layouts.get(cur_layout) {
-            Some(l) if l.kind.as_deref() == Some("title") => p.layouts.iter().position(|l| l.kind.as_deref() == Some("obj")).unwrap_or(cur_layout),
+            Some(l) if l.kind.as_deref() == Some("title") => {
+                p.layouts.iter().position(|l| l.kind.as_deref() == Some("obj")).unwrap_or(cur_layout)
+            }
             _ => cur_layout,
         };
         let mut shapes = Vec::new();
@@ -1115,7 +1211,11 @@ impl App {
             info.text = tb.plain_text();
             let para = tb.paragraphs.first().cloned().unwrap_or_default();
             let pp = ctx.para_props(sh, tb, &para);
-            let run = para.runs.first().map(|r| r.props.clone()).unwrap_or_else(|| para.end_props.clone().unwrap_or_default());
+            let run = para
+                .runs
+                .first()
+                .map(|r| r.props.clone())
+                .unwrap_or_else(|| para.end_props.clone().unwrap_or_default());
             let rp = ctx.run_props(&pp, &run);
             info.size_pt = rp.size.unwrap_or(1800) as f32 / 100.0;
             info.bold = rp.bold.unwrap_or(false);
@@ -1137,7 +1237,10 @@ impl App {
             match f {
                 Fill::Solid(c) => info.fill = Some(ctx.color_with(&c, ph.as_ref()).to_u8()),
                 Fill::Gradient(g) => info.fill = g.stops.first().map(|(_, c)| ctx.color_with(c, ph.as_ref()).to_u8()),
-                Fill::Pattern { fg, .. } => info.fill = Some(fg.as_ref().map(|c| ctx.color_with(c, ph.as_ref()).to_u8()).unwrap_or([0, 0, 0, 255])),
+                Fill::Pattern { fg, .. } => {
+                    info.fill =
+                        Some(fg.as_ref().map(|c| ctx.color_with(c, ph.as_ref()).to_u8()).unwrap_or([0, 0, 0, 255]))
+                }
                 _ => {}
             }
         }
@@ -1190,7 +1293,8 @@ impl App {
 
     pub fn add_image(&mut self, path: &std::path::Path) -> Result<(), String> {
         let data = std::fs::read(path).map_err(|e| e.to_string())?;
-        let reader = image::ImageReader::new(std::io::Cursor::new(&data)).with_guessed_format().map_err(|e| e.to_string())?;
+        let reader =
+            image::ImageReader::new(std::io::Cursor::new(&data)).with_guessed_format().map_err(|e| e.to_string())?;
         let (iw, ih) = reader.into_dimensions().map_err(|e| format!("image illisible : {e}"))?;
         let ext = match path.extension().and_then(|e| e.to_str()).map(str::to_ascii_lowercase).as_deref() {
             Some("jpg") | Some("jpeg") => "jpeg",
@@ -1215,6 +1319,7 @@ impl App {
 }
 
 #[cfg(test)]
+#[allow(clippy::expect_used)]
 mod tests {
     use super::*;
 
@@ -1266,7 +1371,11 @@ mod tests {
     #[test]
     fn resize_rotated_keeps_opposite_corner() {
         let mut a = app();
-        a.insert_shapes(vec![new::shape(0, Xfrm { rot: 30 * 60_000, ..Xfrm::new(3_000_000, 2_000_000, 2_000_000, 1_000_000) }, "rect")]);
+        a.insert_shapes(vec![new::shape(
+            0,
+            Xfrm { rot: 30 * 60_000, ..Xfrm::new(3_000_000, 2_000_000, 2_000_000, 1_000_000) },
+            "rect",
+        )]);
         let id = a.sel[0];
         let orig = a.eff_xfrm(id).expect("xfrm");
         let corner = |x: &Xfrm, sx: f64, sy: f64| {
@@ -1283,14 +1392,20 @@ mod tests {
         a.release(hx + 40.0, hy + 25.0);
         let now = a.eff_xfrm(id).expect("xfrm");
         let anchor_after = corner(&now, -1.0, -1.0);
-        assert!((anchor_before.0 - anchor_after.0).abs() < 2000.0 && (anchor_before.1 - anchor_after.1).abs() < 2000.0, "{anchor_before:?} vs {anchor_after:?}");
+        assert!(
+            (anchor_before.0 - anchor_after.0).abs() < 2000.0 && (anchor_before.1 - anchor_after.1).abs() < 2000.0,
+            "{anchor_before:?} vs {anchor_after:?}"
+        );
         assert!(now.w > orig.w);
     }
 
     #[test]
     fn align_group_and_slides() {
         let mut a = app();
-        a.insert_shapes(vec![new::shape(0, Xfrm::new(1_000_000, 1_000_000, 1_000_000, 1_000_000), "rect"), new::shape(0, Xfrm::new(5_000_000, 3_000_000, 1_500_000, 500_000), "ellipse")]);
+        a.insert_shapes(vec![
+            new::shape(0, Xfrm::new(1_000_000, 1_000_000, 1_000_000, 1_000_000), "rect"),
+            new::shape(0, Xfrm::new(5_000_000, 3_000_000, 1_500_000, 500_000), "ellipse"),
+        ]);
         a.select_all();
         let ids = a.sel.clone();
         assert_eq!(ids.len(), 4, "two placeholders + two shapes");
@@ -1333,7 +1448,8 @@ mod tests {
         let dir = std::env::temp_dir().join("kinaute-test-save.pptx");
         a.save_to(dir.clone()).expect("save");
         let reopened = kinaute_pptx::open(&std::fs::read(&dir).expect("read")).expect("reopen");
-        let texts: Vec<String> = reopened.pres().slides[0].shapes.iter().filter_map(|s| s.text().map(|t| t.plain_text())).collect();
+        let texts: Vec<String> =
+            reopened.pres().slides[0].shapes.iter().filter_map(|s| s.text().map(|t| t.plain_text())).collect();
         assert!(texts.iter().any(|t| t == "hello"), "{texts:?}");
         let _ = std::fs::remove_file(dir);
     }

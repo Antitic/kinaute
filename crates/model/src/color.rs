@@ -146,13 +146,12 @@ impl ColorCtx<'_> {
                     self.scheme.slots.get(slot).copied().unwrap_or(Rgba::BLACK)
                 }
             }
-            ColorBase::System { name, last } => last
-                .as_deref()
-                .and_then(Rgba::from_hex)
-                .unwrap_or(match name.as_str() {
+            ColorBase::System { name, last } => {
+                last.as_deref().and_then(Rgba::from_hex).unwrap_or(match name.as_str() {
                     "window" => Rgba::WHITE,
                     _ => Rgba::BLACK,
-                }),
+                })
+            }
             ColorBase::Preset(name) => preset_color(name),
             ColorBase::ScRgb(r, g, b) => Rgba {
                 r: linear_to_srgb(*r as f32 / 100_000.0),
@@ -160,9 +159,7 @@ impl ColorCtx<'_> {
                 b: linear_to_srgb(*b as f32 / 100_000.0),
                 a: 1.0,
             },
-            ColorBase::Hsl(h, s, l) => {
-                hsl_to_rgb(*h as f32 / 60_000.0, *s as f32 / 100_000.0, *l as f32 / 100_000.0)
-            }
+            ColorBase::Hsl(h, s, l) => hsl_to_rgb(*h as f32 / 60_000.0, *s as f32 / 100_000.0, *l as f32 / 100_000.0),
         };
         apply_mods(base, &c.mods)
     }

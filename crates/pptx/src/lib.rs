@@ -59,7 +59,10 @@ pub fn blank() -> Result<Doc, PptxError> {
         pkg.set(name, Arc::new(text.as_bytes().to_vec()));
     }
     for n in 2..=3 {
-        pkg.set(&format!("ppt/slideLayouts/_rels/slideLayout{n}.xml.rels"), Arc::new(include_bytes!("../template/layout_rels.xml").to_vec()));
+        pkg.set(
+            &format!("ppt/slideLayouts/_rels/slideLayout{n}.xml.rels"),
+            Arc::new(include_bytes!("../template/layout_rels.xml").to_vec()),
+        );
     }
     let bytes = pkg.write()?;
     open(&bytes)

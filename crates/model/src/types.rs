@@ -76,7 +76,11 @@ pub enum Fill {
     Gradient(Gradient),
     Image(ImageFill),
     /// `a:pattFill`: preset name, foreground, background.
-    Pattern { preset: String, fg: Option<Color>, bg: Option<Color> },
+    Pattern {
+        preset: String,
+        fg: Option<Color>,
+        bg: Option<Color>,
+    },
     /// `a:grpFill`: use the parent group's fill.
     Group,
 }
@@ -98,7 +102,10 @@ pub struct Line {
 #[derive(Debug, Clone, PartialEq)]
 pub enum Geometry {
     /// Preset geometry with optional adjust values (`adj`, `adj1`...).
-    Preset { name: String, adj: Vec<(String, i64)> },
+    Preset {
+        name: String,
+        adj: Vec<(String, i64)>,
+    },
     Custom(CustomGeometry),
 }
 
@@ -275,7 +282,10 @@ pub enum RunKind {
     /// `a:br`
     Break,
     /// `a:fld`: field type (`slidenum`, `datetime1`...) and cached text.
-    Field { kind: String, text: String },
+    Field {
+        kind: String,
+        text: String,
+    },
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -391,7 +401,7 @@ impl Placeholder {
     }
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Default)]
 pub struct SpProps {
     pub geom: Option<Geometry>,
     pub fill: Option<Fill>,
@@ -401,12 +411,6 @@ pub struct SpProps {
     pub text: Option<TextBody>,
     /// `txBox="1"`: created as a text box.
     pub text_box: bool,
-}
-
-impl Default for SpProps {
-    fn default() -> Self {
-        SpProps { geom: None, fill: None, line: None, style: None, shadow: None, text: None, text_box: false }
-    }
 }
 
 #[derive(Debug, Clone, PartialEq, Default)]
@@ -483,7 +487,9 @@ pub enum ShapeKind {
     Frame(Box<FrameProps>),
     /// Element Kinaute does not model (kept verbatim); `fallback` holds
     /// shapes parsed from an `mc:Fallback` branch, used for display only.
-    Opaque { fallback: Vec<Shape> },
+    Opaque {
+        fallback: Vec<Shape>,
+    },
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -527,7 +533,10 @@ impl Shape {
 pub enum Background {
     Fill(Fill),
     /// `p:bgRef` into the theme's background fill styles.
-    Ref { idx: u32, color: Option<Color> },
+    Ref {
+        idx: u32,
+        color: Option<Color>,
+    },
 }
 
 /// Slide transition (`p:transition`).

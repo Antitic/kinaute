@@ -1,3 +1,4 @@
+#![cfg_attr(test, allow(clippy::expect_used))]
 //! Lossless XML tree for Kinaute.
 //!
 //! OOXML parts are parsed into a small owned tree that keeps *everything*:
@@ -206,11 +207,7 @@ impl Element {
     /// order). Elements not listed in `order` are treated as coming last.
     pub fn put_child_ordered(&mut self, new: Element, order: &[&str]) {
         let local = new.local().to_string();
-        if let Some(pos) = self
-            .children
-            .iter()
-            .position(|n| matches!(n, Node::Element(e) if e.local() == local))
-        {
+        if let Some(pos) = self.children.iter().position(|n| matches!(n, Node::Element(e) if e.local() == local)) {
             self.children[pos] = Node::Element(new);
             return;
         }
@@ -371,16 +368,10 @@ impl Document {
             Err(_) => {
                 // UTF-16 documents are legal OOXML but rare; decode them.
                 if bytes.len() >= 2 && (bytes[0] == 0xFF && bytes[1] == 0xFE) {
-                    let u16s: Vec<u16> = bytes[2..]
-                        .chunks_exact(2)
-                        .map(|c| u16::from_le_bytes([c[0], c[1]]))
-                        .collect();
+                    let u16s: Vec<u16> = bytes[2..].chunks_exact(2).map(|c| u16::from_le_bytes([c[0], c[1]])).collect();
                     std::borrow::Cow::Owned(String::from_utf16(&u16s).map_err(|_| XmlError::Encoding)?)
                 } else if bytes.len() >= 2 && (bytes[0] == 0xFE && bytes[1] == 0xFF) {
-                    let u16s: Vec<u16> = bytes[2..]
-                        .chunks_exact(2)
-                        .map(|c| u16::from_be_bytes([c[0], c[1]]))
-                        .collect();
+                    let u16s: Vec<u16> = bytes[2..].chunks_exact(2).map(|c| u16::from_be_bytes([c[0], c[1]])).collect();
                     std::borrow::Cow::Owned(String::from_utf16(&u16s).map_err(|_| XmlError::Encoding)?)
                 } else {
                     return Err(XmlError::Encoding);

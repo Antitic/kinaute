@@ -158,6 +158,7 @@ export component MainWindow inherits Window {
     callback move-slide(int);
     callback toggle-hidden();
     callback pick-slide(int);
+    callback slide-dragged(int, int);
     callback play(bool);
     callback text-edited(string);
     callback font-size-accepted(string);
@@ -266,7 +267,19 @@ export component MainWindow inherits Window {
                                     }
                                 }
                             }
-                            TouchArea { clicked => { root.pick-slide(s.number - 1); } }
+                            // Click selects; dragging vertically reorders (one row = 124 px).
+                            TouchArea {
+                                mouse-cursor: self.pressed ? MouseCursor.grabbing : MouseCursor.default;
+                                pointer-event(ev) => {
+                                    if (ev.button == PointerEventButton.left && ev.kind == PointerEventKind.up) {
+                                        if (abs(self.mouse-y - self.pressed-y) < 10px) {
+                                            root.pick-slide(s.number - 1);
+                                        } else {
+                                            root.slide-dragged(s.number - 1, round((self.mouse-y - self.pressed-y) / 124px));
+                                        }
+                                    }
+                                }
+                            }
                         }
                     }
                 }

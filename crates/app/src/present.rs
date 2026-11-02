@@ -41,7 +41,12 @@ pub fn to_image(pm: &Pixmap) -> slint::Image {
 
 impl Present {
     /// Start a presentation at slide `start` (index into the document).
-    pub fn start(pres: Presentation, start: usize, renderer: Rc<RefCell<Renderer>>, on_exit: Box<dyn Fn()>) -> Result<Rc<RefCell<Present>>, slint::PlatformError> {
+    pub fn start(
+        pres: Presentation,
+        start: usize,
+        renderer: Rc<RefCell<Renderer>>,
+        on_exit: Box<dyn Fn()>,
+    ) -> Result<Rc<RefCell<Present>>, slint::PlatformError> {
         let win = PresentWindow::new()?;
         let order: Vec<usize> = (0..pres.slides.len()).filter(|i| !pres.slides[*i].hidden || *i == start).collect();
         let pos = order.iter().position(|i| *i == start).unwrap_or(0);
@@ -115,28 +120,28 @@ impl Present {
         }
     }
 
-    fn slide_pixmap(&mut self, idx: usize) -> Rc<Pixmap> {
+    fn slide_pixmap(&mut self, idx: usize) -> Option<Rc<Pixmap>> {
         if let Some(p) = self.cache.get(&idx) {
-            return p.clone();
+            return Some(p.clone());
         }
         let pm = {
             let mut r = self.renderer.borrow_mut();
             r.show_prompts = false;
             r.render_slide(&self.pres, idx, self.size.0)
         };
-        let pm = Rc::new(pm.unwrap_or_else(|| Pixmap::new(self.size.0, self.size.1).unwrap_or_else(|| Pixmap::new(1, 1).expect("1x1 pixmap"))));
+        let pm = Rc::new(pm?);
         // Keep only a small window of slides in memory (old machines).
         if self.cache.len() > 4 {
             let keep: Vec<usize> = self.order.iter().skip(self.pos.saturating_sub(1)).take(3).copied().collect();
             self.cache.retain(|k, _| keep.contains(k));
         }
         self.cache.insert(idx, pm.clone());
-        pm
+        Some(pm)
     }
 
     fn show_current(&mut self) {
         let Some(&idx) = self.order.get(self.pos) else { return };
-        let pm = self.slide_pixmap(idx);
+        let Some(pm) = self.slide_pixmap(idx) else { return };
         self.win.set_frame(to_image(&pm));
         self.schedule_auto();
         // Pre-render the next slide while the audience reads this one.
@@ -180,8 +185,7 @@ impl Present {
         let t = self.pres.slides[to_idx].transition.clone().filter(|t| t.kind != "none" && t.kind != "cut");
         match (animate, t) {
             (true, Some(kind)) if target != self.pos => {
-                let from = self.slide_pixmap(from_idx);
-                let to = self.slide_pixmap(to_idx);
+                let (Some(from), Some(to)) = (self.slide_pixmap(from_idx), self.slide_pixmap(to_idx)) else { return };
                 self.anim = Some(Anim { from, to, kind, start: Instant::now(), target_pos: target });
                 self.auto.stop();
                 let me = self.me.clone();

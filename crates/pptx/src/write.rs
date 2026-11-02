@@ -15,18 +15,66 @@ const NS_P: &str = "http://schemas.openxmlformats.org/presentationml/2006/main";
 const CT_SLIDE: &str = "application/vnd.openxmlformats-officedocument.presentationml.slide+xml";
 
 const SPPR_ORDER: &[&str] = &[
-    "xfrm", "custGeom", "prstGeom", "noFill", "solidFill", "gradFill", "blipFill", "pattFill", "grpFill", "ln",
-    "effectLst", "effectDag", "scene3d", "sp3d", "extLst",
+    "xfrm",
+    "custGeom",
+    "prstGeom",
+    "noFill",
+    "solidFill",
+    "gradFill",
+    "blipFill",
+    "pattFill",
+    "grpFill",
+    "ln",
+    "effectLst",
+    "effectDag",
+    "scene3d",
+    "sp3d",
+    "extLst",
 ];
 const FILLS: &[&str] = &["noFill", "solidFill", "gradFill", "blipFill", "pattFill", "grpFill"];
 const SP_ORDER: &[&str] = &["nvSpPr", "nvCxnSpPr", "nvPicPr", "spPr", "blipFill", "style", "txBody", "extLst"];
 const RPR_ORDER: &[&str] = &[
-    "ln", "noFill", "solidFill", "gradFill", "blipFill", "pattFill", "grpFill", "effectLst", "effectDag", "highlight",
-    "uLnTx", "uLn", "uFillTx", "uFill", "latin", "ea", "cs", "sym", "hlinkClick", "hlinkMouseOver", "rtl", "extLst",
+    "ln",
+    "noFill",
+    "solidFill",
+    "gradFill",
+    "blipFill",
+    "pattFill",
+    "grpFill",
+    "effectLst",
+    "effectDag",
+    "highlight",
+    "uLnTx",
+    "uLn",
+    "uFillTx",
+    "uFill",
+    "latin",
+    "ea",
+    "cs",
+    "sym",
+    "hlinkClick",
+    "hlinkMouseOver",
+    "rtl",
+    "extLst",
 ];
 const PPR_ORDER: &[&str] = &[
-    "lnSpc", "spcBef", "spcAft", "buClrTx", "buClr", "buSzTx", "buSzPct", "buSzPts", "buFontTx", "buFont", "buNone",
-    "buAutoNum", "buChar", "buBlip", "tabLst", "defRPr", "extLst",
+    "lnSpc",
+    "spcBef",
+    "spcAft",
+    "buClrTx",
+    "buClr",
+    "buSzTx",
+    "buSzPct",
+    "buSzPts",
+    "buFontTx",
+    "buFont",
+    "buNone",
+    "buAutoNum",
+    "buChar",
+    "buBlip",
+    "tabLst",
+    "defRPr",
+    "extLst",
 ];
 const SLD_ORDER: &[&str] = &["cSld", "clrMapOvr", "transition", "timing", "extLst"];
 
@@ -68,12 +116,14 @@ pub fn gen_color(c: &Color) -> Element {
             e
         }
         ColorBase::Preset(v) => Element::new("a:prstClr").with_attr("val", v.clone()),
-        ColorBase::ScRgb(r, g, b) => {
-            Element::new("a:scrgbClr").with_attr("r", r.to_string()).with_attr("g", g.to_string()).with_attr("b", b.to_string())
-        }
-        ColorBase::Hsl(h, s, l) => {
-            Element::new("a:hslClr").with_attr("hue", h.to_string()).with_attr("sat", s.to_string()).with_attr("lum", l.to_string())
-        }
+        ColorBase::ScRgb(r, g, b) => Element::new("a:scrgbClr")
+            .with_attr("r", r.to_string())
+            .with_attr("g", g.to_string())
+            .with_attr("b", b.to_string()),
+        ColorBase::Hsl(h, s, l) => Element::new("a:hslClr")
+            .with_attr("hue", h.to_string())
+            .with_attr("sat", s.to_string())
+            .with_attr("lum", l.to_string()),
     };
     for (k, v) in &c.mods {
         let m = Element::new(format!("a:{k}"));
@@ -96,10 +146,16 @@ fn gen_fill(f: &Fill, wr: &mut Wr) -> Element {
             for (pos, c) in &g.stops {
                 lst = lst.with_child(Element::new("a:gs").with_attr("pos", pos.to_string()).with_child(gen_color(c)));
             }
-            let mut e = Element::new("a:gradFill").with_attr("rotWithShape", if g.rot_with_shape { "1" } else { "0" }).with_child(lst);
+            let mut e = Element::new("a:gradFill")
+                .with_attr("rotWithShape", if g.rot_with_shape { "1" } else { "0" })
+                .with_child(lst);
             match &g.kind {
                 GradientKind::Linear { angle, scaled } => {
-                    e = e.with_child(Element::new("a:lin").with_attr("ang", angle.to_string()).with_attr("scaled", if *scaled { "1" } else { "0" }));
+                    e = e.with_child(
+                        Element::new("a:lin")
+                            .with_attr("ang", angle.to_string())
+                            .with_attr("scaled", if *scaled { "1" } else { "0" }),
+                    );
                 }
                 GradientKind::Path { path, focus } => {
                     e = e.with_child(
@@ -148,7 +204,11 @@ fn gen_blip_fill(name: &str, i: &ImageFill, wr: &mut Wr) -> Element {
         }
         e = e.with_child(s);
     }
-    e.with_child(if i.stretch { Element::new("a:stretch").with_child(Element::new("a:fillRect")) } else { Element::new("a:tile") })
+    e.with_child(if i.stretch {
+        Element::new("a:stretch").with_child(Element::new("a:fillRect"))
+    } else {
+        Element::new("a:tile")
+    })
 }
 
 fn gen_line(l: &Line, wr: &mut Wr, src: Option<&Element>) -> Element {
@@ -160,9 +220,38 @@ fn gen_line(l: &Line, wr: &mut Wr, src: Option<&Element>) -> Element {
     }
     if let Some(f) = &l.fill {
         let fe = gen_fill(f, wr);
-        e.put_child_ordered(fe, &["noFill", "solidFill", "gradFill", "pattFill", "prstDash", "custDash", "round", "bevel", "miter", "headEnd", "tailEnd", "extLst"]);
+        e.put_child_ordered(
+            fe,
+            &[
+                "noFill",
+                "solidFill",
+                "gradFill",
+                "pattFill",
+                "prstDash",
+                "custDash",
+                "round",
+                "bevel",
+                "miter",
+                "headEnd",
+                "tailEnd",
+                "extLst",
+            ],
+        );
     }
-    let order = ["noFill", "solidFill", "gradFill", "pattFill", "prstDash", "custDash", "round", "bevel", "miter", "headEnd", "tailEnd", "extLst"];
+    let order = [
+        "noFill",
+        "solidFill",
+        "gradFill",
+        "pattFill",
+        "prstDash",
+        "custDash",
+        "round",
+        "bevel",
+        "miter",
+        "headEnd",
+        "tailEnd",
+        "extLst",
+    ];
     e.remove_children("prstDash");
     if let Some(d) = &l.dash {
         e.put_child_ordered(Element::new("a:prstDash").with_attr("val", d.clone()), &order);
@@ -206,7 +295,9 @@ fn gen_geom(g: &Geometry) -> Option<Element> {
         Geometry::Preset { name, adj } => {
             let mut av = Element::new("a:avLst");
             for (n, v) in adj {
-                av = av.with_child(Element::new("a:gd").with_attr("name", n.clone()).with_attr("fmla", format!("val {v}")));
+                av = av.with_child(
+                    Element::new("a:gd").with_attr("name", n.clone()).with_attr("fmla", format!("val {v}")),
+                );
             }
             Some(Element::new("a:prstGeom").with_attr("prst", name.clone()).with_child(av))
         }
@@ -239,7 +330,11 @@ fn gen_style(s: &StyleRefs) -> Element {
     if let Some(c) = &s.font.1 {
         font = font.with_child(gen_color(c));
     }
-    Element::new("p:style").with_child(r("a:lnRef", &s.line)).with_child(r("a:fillRef", &s.fill)).with_child(r("a:effectRef", &s.effect)).with_child(font)
+    Element::new("p:style")
+        .with_child(r("a:lnRef", &s.line))
+        .with_child(r("a:fillRef", &s.fill))
+        .with_child(r("a:effectRef", &s.effect))
+        .with_child(font)
 }
 
 // ------------------------------------------------------------------ text ---
@@ -277,13 +372,15 @@ fn apply_ppr(e: &mut Element, level: u8, p: &ParaProps, wr: &mut Wr) {
     e.set_opt_attr("rtl", p.rtl.map(|v| (if v { "1" } else { "0" }).to_string()));
     e.set_opt_attr(
         "algn",
-        p.align.map(|a| match a {
-            Align::Left => "l",
-            Align::Center => "ctr",
-            Align::Right => "r",
-            Align::Justify => "just",
-        }
-        .to_string()),
+        p.align.map(|a| {
+            match a {
+                Align::Left => "l",
+                Align::Center => "ctr",
+                Align::Right => "r",
+                Align::Justify => "just",
+            }
+            .to_string()
+        }),
     );
     for (name, sp) in [("lnSpc", &p.line_spacing), ("spcBef", &p.space_before), ("spcAft", &p.space_after)] {
         e.remove_children(name);
@@ -389,7 +486,11 @@ fn gen_paragraph(p: &Paragraph, wr: &mut Wr) -> Element {
         e.children.push(Node::Element(gen_run(r, wr)));
     }
     if let Some(ep) = &p.end_props {
-        let mut x = p.source.as_ref().and_then(|s| s.child("endParaRPr").cloned()).unwrap_or_else(|| Element::new("a:endParaRPr"));
+        let mut x = p
+            .source
+            .as_ref()
+            .and_then(|s| s.child("endParaRPr").cloned())
+            .unwrap_or_else(|| Element::new("a:endParaRPr"));
         apply_rpr(&mut x, ep, wr);
         e.children.push(Node::Element(x));
     }
@@ -400,12 +501,14 @@ fn gen_body_pr(b: &BodyProps, src: Option<&Element>) -> Element {
     let mut e = src.cloned().unwrap_or_else(|| Element::new("a:bodyPr"));
     e.set_opt_attr(
         "anchor",
-        b.anchor.map(|a| match a {
-            Anchor::Top => "t",
-            Anchor::Middle => "ctr",
-            Anchor::Bottom => "b",
-        }
-        .to_string()),
+        b.anchor.map(|a| {
+            match a {
+                Anchor::Top => "t",
+                Anchor::Middle => "ctr",
+                Anchor::Bottom => "b",
+            }
+            .to_string()
+        }),
     );
     e.set_opt_attr("anchorCtr", b.anchor_ctr.map(|v| (if v { "1" } else { "0" }).to_string()));
     for (name, v) in ["lIns", "tIns", "rIns", "bIns"].iter().zip(b.insets) {
@@ -433,7 +536,10 @@ fn gen_body_pr(b: &BodyProps, src: Option<&Element>) -> Element {
                 n
             }
         };
-        e.put_child_ordered(af, &["prstTxWarp", "noAutofit", "normAutofit", "spAutoFit", "scene3d", "sp3d", "flatTx", "extLst"]);
+        e.put_child_ordered(
+            af,
+            &["prstTxWarp", "noAutofit", "normAutofit", "spAutoFit", "scene3d", "sp3d", "flatTx", "extLst"],
+        );
     }
     e
 }
@@ -463,7 +569,8 @@ fn gen_tx_body(name: &str, tb: &TextBody, wr: &mut Wr) -> Element {
         None => gen_body_pr(&tb.body, tb.source_body_pr.as_deref()),
     };
     let mut e = Element::new(name).with_child(body_pr);
-    let lst_unchanged = tb.source_lst_style.as_ref().filter(|s| read::list_style_of(s, &Rd { rels: &wr.rels }) == tb.list_style);
+    let lst_unchanged =
+        tb.source_lst_style.as_ref().filter(|s| read::list_style_of(s, &Rd { rels: &wr.rels }) == tb.list_style);
     match lst_unchanged {
         Some(s) => e.children.push(Node::Element((**s).clone())),
         None => {
@@ -486,7 +593,10 @@ fn gen_tx_body(name: &str, tb: &TextBody, wr: &mut Wr) -> Element {
 
 fn set_cnv_pr(e: &mut Element, nv: &str, s: &Shape) {
     let nv_el = e.ensure_child_ordered(nv, SP_ORDER);
-    let pr = nv_el.ensure_child_ordered("p:cNvPr", &["cNvPr", "cNvSpPr", "cNvCxnSpPr", "cNvPicPr", "cNvGrpSpPr", "cNvGraphicFramePr", "nvPr"]);
+    let pr = nv_el.ensure_child_ordered(
+        "p:cNvPr",
+        &["cNvPr", "cNvSpPr", "cNvCxnSpPr", "cNvPicPr", "cNvGrpSpPr", "cNvGraphicFramePr", "nvPr"],
+    );
     pr.set_attr("id", s.id.to_string());
     pr.set_attr("name", s.name.clone());
     pr.set_opt_attr("descr", s.descr.clone());
@@ -497,7 +607,10 @@ fn new_nv(kind: &str, s: &Shape) -> Element {
     let (nv, cnv) = match kind {
         "sp" => ("p:nvSpPr", Element::new("p:cNvSpPr")),
         "cxnSp" => ("p:nvCxnSpPr", Element::new("p:cNvCxnSpPr")),
-        "pic" => ("p:nvPicPr", Element::new("p:cNvPicPr").with_child(Element::new("a:picLocks").with_attr("noChangeAspect", "1"))),
+        "pic" => (
+            "p:nvPicPr",
+            Element::new("p:cNvPicPr").with_child(Element::new("a:picLocks").with_attr("noChangeAspect", "1")),
+        ),
         "grpSp" => ("p:nvGrpSpPr", Element::new("p:cNvGrpSpPr")),
         _ => ("p:nvGraphicFramePr", Element::new("p:cNvGraphicFramePr")),
     };
@@ -512,10 +625,21 @@ fn new_nv(kind: &str, s: &Shape) -> Element {
         }
         nvpr = nvpr.with_child(p);
     }
-    Element::new(nv).with_child(Element::new("p:cNvPr").with_attr("id", s.id.to_string()).with_attr("name", s.name.clone())).with_child(cnv).with_child(nvpr)
+    Element::new(nv)
+        .with_child(Element::new("p:cNvPr").with_attr("id", s.id.to_string()).with_attr("name", s.name.clone()))
+        .with_child(cnv)
+        .with_child(nvpr)
 }
 
-fn patch_sp_pr(sp_pr: &mut Element, xfrm: Option<&Xfrm>, geom: Option<&Geometry>, fill: Option<&Fill>, line: Option<&Line>, shadow: Option<&Shadow>, wr: &mut Wr) {
+fn patch_sp_pr(
+    sp_pr: &mut Element,
+    xfrm: Option<&Xfrm>,
+    geom: Option<&Geometry>,
+    fill: Option<&Fill>,
+    line: Option<&Line>,
+    shadow: Option<&Shadow>,
+    wr: &mut Wr,
+) {
     if let Some(x) = xfrm {
         let name = if sp_pr.prefix().is_empty() { "xfrm".to_string() } else { format!("{}:xfrm", "a") };
         sp_pr.put_child_ordered(gen_xfrm(x, &name), SPPR_ORDER);
@@ -565,7 +689,15 @@ fn gen_shape(s: &Shape, wr: &mut Wr) -> Element {
                 }
             }
             let pr = e.ensure_child_ordered("p:spPr", SP_ORDER);
-            patch_sp_pr(pr, s.xfrm.as_ref(), sp.geom.as_ref(), sp.fill.as_ref(), sp.line.as_ref(), sp.shadow.as_ref(), wr);
+            patch_sp_pr(
+                pr,
+                s.xfrm.as_ref(),
+                sp.geom.as_ref(),
+                sp.fill.as_ref(),
+                sp.line.as_ref(),
+                sp.shadow.as_ref(),
+                wr,
+            );
             e.remove_children("style");
             if let Some(st) = &sp.style {
                 e.put_child_ordered(gen_style(st), SP_ORDER);
@@ -598,9 +730,32 @@ fn gen_shape(s: &Shape, wr: &mut Wr) -> Element {
                 if let Some(x) = &s.xfrm {
                     let mut xe = gen_xfrm(x, "a:xfrm");
                     xe = xe
-                        .with_child(Element::new("a:chOff").with_attr("x", g.child.x.to_string()).with_attr("y", g.child.y.to_string()))
-                        .with_child(Element::new("a:chExt").with_attr("cx", g.child.w.to_string()).with_attr("cy", g.child.h.to_string()));
-                    pr.put_child_ordered(xe, &["xfrm", "noFill", "solidFill", "gradFill", "blipFill", "pattFill", "grpFill", "effectLst", "effectDag", "scene3d", "extLst"]);
+                        .with_child(
+                            Element::new("a:chOff")
+                                .with_attr("x", g.child.x.to_string())
+                                .with_attr("y", g.child.y.to_string()),
+                        )
+                        .with_child(
+                            Element::new("a:chExt")
+                                .with_attr("cx", g.child.w.to_string())
+                                .with_attr("cy", g.child.h.to_string()),
+                        );
+                    pr.put_child_ordered(
+                        xe,
+                        &[
+                            "xfrm",
+                            "noFill",
+                            "solidFill",
+                            "gradFill",
+                            "blipFill",
+                            "pattFill",
+                            "grpFill",
+                            "effectLst",
+                            "effectDag",
+                            "scene3d",
+                            "extLst",
+                        ],
+                    );
                 }
             }
             write_tree_children(&mut e, &g.shapes, wr);
@@ -655,7 +810,15 @@ fn gen_transition(t: &Transition) -> Element {
     if t.kind != "none" {
         let mut k = Element::new(format!("p:{}", t.kind));
         if let Some(d) = &t.dir {
-            k.attrs.push((if matches!(t.kind.as_str(), "split" | "blinds" | "checker" | "comb" | "randomBar") { "orient" } else { "dir" }.into(), d.clone()));
+            k.attrs.push((
+                if matches!(t.kind.as_str(), "split" | "blinds" | "checker" | "comb" | "randomBar") {
+                    "orient"
+                } else {
+                    "dir"
+                }
+                .into(),
+                d.clone(),
+            ));
         }
         e = e.with_child(k);
     }
@@ -664,9 +827,8 @@ fn gen_transition(t: &Transition) -> Element {
 
 fn gen_background(b: &Background, wr: &mut Wr) -> Element {
     match b {
-        Background::Fill(f) => Element::new("p:bg").with_child(
-            Element::new("p:bgPr").with_child(gen_fill(f, wr)).with_child(Element::new("a:effectLst")),
-        ),
+        Background::Fill(f) => Element::new("p:bg")
+            .with_child(Element::new("p:bgPr").with_child(gen_fill(f, wr)).with_child(Element::new("a:effectLst"))),
         Background::Ref { idx, color } => {
             let mut r = Element::new("p:bgRef").with_attr("idx", idx.to_string());
             if let Some(c) = color {
@@ -691,7 +853,13 @@ fn new_slide_root() -> Element {
                             .with_child(Element::new("p:cNvGrpSpPr"))
                             .with_child(Element::new("p:nvPr")),
                     )
-                    .with_child(Element::new("p:grpSpPr").with_child(gen_xfrm(&Xfrm::default(), "a:xfrm").with_child(Element::new("a:chOff").with_attr("x", "0").with_attr("y", "0")).with_child(Element::new("a:chExt").with_attr("cx", "0").with_attr("cy", "0")))),
+                    .with_child(
+                        Element::new("p:grpSpPr").with_child(
+                            gen_xfrm(&Xfrm::default(), "a:xfrm")
+                                .with_child(Element::new("a:chOff").with_attr("x", "0").with_attr("y", "0"))
+                                .with_child(Element::new("a:chExt").with_attr("cx", "0").with_attr("cy", "0")),
+                        ),
+                    ),
             ),
         )
         .with_child(Element::new("p:clrMapOvr").with_child(Element::new("a:masterClrMapping")))
@@ -823,7 +991,10 @@ pub fn save(pres: &Presentation, original: &Package) -> Result<Vec<u8>, PptxErro
             match rels.iter_mut().find(|r| r.ty == REL_LAYOUT) {
                 Some(r) => r.target = lp.clone(),
                 None => {
-                    let id = (1..).map(|n| format!("rId{n}")).find(|id| !rels.iter().any(|r| &r.id == id)).unwrap_or_default();
+                    let id = (1..)
+                        .map(|n| format!("rId{n}"))
+                        .find(|id| !rels.iter().any(|r| &r.id == id))
+                        .unwrap_or_default();
                     rels.push(Rel { id, ty: REL_LAYOUT.into(), target: lp.clone(), external: false });
                 }
             }
@@ -847,7 +1018,8 @@ pub fn save(pres: &Presentation, original: &Package) -> Result<Vec<u8>, PptxErro
             Some(x) => x.clone(),
             None => {
                 max_id += 1;
-                let rid = (1..).map(|n| format!("rId{n}")).find(|id| !prels.iter().any(|r| &r.id == id)).unwrap_or_default();
+                let rid =
+                    (1..).map(|n| format!("rId{n}")).find(|id| !prels.iter().any(|r| &r.id == id)).unwrap_or_default();
                 prels.push(Rel { id: rid.clone(), ty: REL_SLIDE.into(), target: part.clone(), external: false });
                 (max_id, rid)
             }
@@ -857,7 +1029,10 @@ pub fn save(pres: &Presentation, original: &Package) -> Result<Vec<u8>, PptxErro
     }
 
     // Presentation: slide list and size.
-    pxml.root.put_child_ordered(sld_ids, &["sldMasterIdLst", "notesMasterIdLst", "handoutMasterIdLst", "sldIdLst", "sldSz", "notesSz"]);
+    pxml.root.put_child_ordered(
+        sld_ids,
+        &["sldMasterIdLst", "notesMasterIdLst", "handoutMasterIdLst", "sldIdLst", "sldSz", "notesSz"],
+    );
     if let Some(sz) = pxml.root.child_mut("sldSz") {
         sz.set_attr("cx", pres.slide_w.to_string());
         sz.set_attr("cy", pres.slide_h.to_string());
@@ -887,7 +1062,9 @@ pub fn save(pres: &Presentation, original: &Package) -> Result<Vec<u8>, PptxErro
 
 fn remove_override(ct: &mut Xml, part: &str) {
     let pn = format!("/{part}");
-    ct.root.children.retain(|n| !matches!(n, Node::Element(e) if e.local() == "Override" && e.attr("PartName") == Some(pn.as_str())));
+    ct.root.children.retain(
+        |n| !matches!(n, Node::Element(e) if e.local() == "Override" && e.attr("PartName") == Some(pn.as_str())),
+    );
 }
 
 fn add_override(ct: &mut Xml, part: &str, ty: &str) {
@@ -895,15 +1072,23 @@ fn add_override(ct: &mut Xml, part: &str, ty: &str) {
     if ct.root.elements().any(|e| e.local() == "Override" && e.attr("PartName") == Some(pn.as_str())) {
         return;
     }
-    ct.root.children.push(Node::Element(Element::new("Override").with_attr("PartName", pn).with_attr("ContentType", ty)));
+    ct.root
+        .children
+        .push(Node::Element(Element::new("Override").with_attr("PartName", pn).with_attr("ContentType", ty)));
 }
 
 fn add_default(ct: &mut Xml, ext: &str, ty: &str) {
-    if ct.root.elements().any(|e| e.local() == "Default" && e.attr("Extension").map(|x| x.eq_ignore_ascii_case(ext)).unwrap_or(false)) {
+    if ct
+        .root
+        .elements()
+        .any(|e| e.local() == "Default" && e.attr("Extension").map(|x| x.eq_ignore_ascii_case(ext)).unwrap_or(false))
+    {
         return;
     }
     // Defaults must come before Overrides by convention.
-    ct.root.children.insert(0, Node::Element(Element::new("Default").with_attr("Extension", ext).with_attr("ContentType", ty)));
+    ct.root
+        .children
+        .insert(0, Node::Element(Element::new("Default").with_attr("Extension", ext).with_attr("ContentType", ty)));
 }
 
 /// Convenience: media bytes for a part name.

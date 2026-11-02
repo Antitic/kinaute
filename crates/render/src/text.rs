@@ -1,7 +1,10 @@
 //! Text layout and drawing.
 
 use super::{Renderer, Scene};
-use cosmic_text::{Align as CAlign, Attrs, AttrsOwned, Buffer, Color as CColor, Family, FontSystem, Metrics, Shaping, Style, SwashCache, Weight, Wrap};
+use cosmic_text::{
+    Align as CAlign, Attrs, AttrsOwned, Buffer, Color as CColor, Family, FontSystem, Metrics, Shaping, Style,
+    SwashCache, Weight, Wrap,
+};
 use kinaute_model::resolve::{Ctx, DEFAULT_FONT_SIZE, DEFAULT_INSETS};
 use kinaute_model::*;
 use std::collections::HashMap;
@@ -37,12 +40,41 @@ pub struct TextMetrics {
 
 impl TextEngine {
     pub fn new() -> Self {
+        let mut fonts = FontSystem::new();
+        Self::set_generic_families(&mut fonts);
         TextEngine {
-            fonts: FontSystem::new(),
+            fonts,
             swash: SwashCache::new(),
             media: Arc::new(MediaStore::new()),
             families: HashMap::new(),
             warned: Default::default(),
+        }
+    }
+
+    /// Point the generic families (sans-serif, serif, monospace) at installed
+    /// fonts. Without this a missing "Arial" can resolve to any face, even a
+    /// monospace one.
+    fn set_generic_families(fonts: &mut FontSystem) {
+        let has = |db: &cosmic_text::fontdb::Database, name: &str| {
+            db.faces().any(|f| f.families.iter().any(|(n, _)| n.eq_ignore_ascii_case(name)))
+        };
+        let pick =
+            |db: &cosmic_text::fontdb::Database, list: &[&str]| list.iter().find(|n| has(db, n)).map(|n| n.to_string());
+        let db = fonts.db_mut();
+        if let Some(f) =
+            pick(db, &["Liberation Sans", "Arimo", "Carlito", "Inter", "DejaVu Sans", "FreeSans", "Noto Sans"])
+        {
+            db.set_sans_serif_family(f);
+        }
+        if let Some(f) = pick(db, &["Liberation Serif", "Tinos", "Caladea", "DejaVu Serif", "FreeSerif", "Noto Serif"])
+        {
+            db.set_serif_family(f);
+        }
+        if let Some(f) = pick(
+            db,
+            &["Liberation Mono", "Cousine", "DejaVu Sans Mono", "FreeMono", "JetBrains Mono", "Noto Sans Mono"],
+        ) {
+            db.set_monospace_family(f);
         }
     }
 
@@ -60,13 +92,19 @@ impl TextEngine {
         let alias: &[&str] = match lower.as_str() {
             "calibri" | "calibri light" | "segoe ui" | "segoe ui light" => &["Carlito", "Inter", "DejaVu Sans"],
             "cambria" | "cambria math" => &["Caladea", "DejaVu Serif"],
-            "arial" | "helvetica" | "helvetica neue" | "arial unicode ms" => &["Liberation Sans", "Arimo", "FreeSans", "DejaVu Sans"],
+            "arial" | "helvetica" | "helvetica neue" | "arial unicode ms" => {
+                &["Liberation Sans", "Arimo", "FreeSans", "DejaVu Sans"]
+            }
             "arial narrow" => &["Liberation Sans Narrow", "Liberation Sans"],
             "times new roman" | "times" => &["Liberation Serif", "Tinos", "FreeSerif", "DejaVu Serif"],
             "courier new" | "courier" => &["Liberation Mono", "Cousine", "FreeMono", "DejaVu Sans Mono"],
             "consolas" | "lucida console" | "menlo" | "monaco" => &["JetBrains Mono", "DejaVu Sans Mono"],
-            "verdana" | "tahoma" | "trebuchet ms" | "gill sans mt" | "century gothic" | "franklin gothic book" => &["DejaVu Sans", "Inter"],
-            "georgia" | "palatino linotype" | "book antiqua" | "garamond" | "constantia" => &["DejaVu Serif", "Caladea"],
+            "verdana" | "tahoma" | "trebuchet ms" | "gill sans mt" | "century gothic" | "franklin gothic book" => {
+                &["DejaVu Sans", "Inter"]
+            }
+            "georgia" | "palatino linotype" | "book antiqua" | "garamond" | "constantia" => {
+                &["DejaVu Serif", "Caladea"]
+            }
             _ => &[],
         };
         let mut choice = None;
@@ -82,9 +120,14 @@ impl TextEngine {
         }
         let choice = choice.unwrap_or_else(|| {
             self.warned.insert(name.to_string());
-            if ["serif", "times", "georgia", "cambria", "garamond", "palatino", "book", "roman"].iter().any(|k| lower.contains(k)) && !lower.contains("sans") {
+            if ["serif", "times", "georgia", "cambria", "garamond", "palatino", "book", "roman"]
+                .iter()
+                .any(|k| lower.contains(k))
+                && !lower.contains("sans")
+            {
                 FamilyChoice::Serif
-            } else if ["mono", "courier", "consolas", "code"].iter().any(|k| lower.contains(k)) {
+            } else if ["mono", "courier", "consolas", "typewriter", "menlo", "fixed"].iter().any(|k| lower.contains(k))
+            {
                 FamilyChoice::Mono
             } else {
                 FamilyChoice::Sans
@@ -148,7 +191,21 @@ fn bullet_text(b: &Bullet, number: i32) -> Option<String> {
                 s
             };
             let roman = |n: i32, upper: bool| {
-                let table = [(1000, "m"), (900, "cm"), (500, "d"), (400, "cd"), (100, "c"), (90, "xc"), (50, "l"), (40, "xl"), (10, "x"), (9, "ix"), (5, "v"), (4, "iv"), (1, "i")];
+                let table = [
+                    (1000, "m"),
+                    (900, "cm"),
+                    (500, "d"),
+                    (400, "cd"),
+                    (100, "c"),
+                    (90, "xc"),
+                    (50, "l"),
+                    (40, "xl"),
+                    (10, "x"),
+                    (9, "ix"),
+                    (5, "v"),
+                    (4, "iv"),
+                    (1, "i"),
+                ];
                 let mut s = String::new();
                 let mut v = n.min(3999);
                 for (val, sym) in table {
@@ -157,7 +214,11 @@ fn bullet_text(b: &Bullet, number: i32) -> Option<String> {
                         v -= val;
                     }
                 }
-                if upper { s.to_uppercase() } else { s }
+                if upper {
+                    s.to_uppercase()
+                } else {
+                    s
+                }
             };
             let (body, suffix) = match scheme.as_str() {
                 s if s.starts_with("alphaLc") => (alpha(n, false), s.strip_prefix("alphaLc")),
@@ -179,7 +240,16 @@ fn bullet_text(b: &Bullet, number: i32) -> Option<String> {
 
 impl Renderer {
     /// Build shaper spans for a run.
-    fn run_span(&mut self, ctx: &Ctx, sc: &Scene, pp: &ParaProps, run: &Run, scale: f32, k: f32, ink: tiny_skia::Color) -> Option<Span> {
+    fn run_span(
+        &mut self,
+        ctx: &Ctx,
+        sc: &Scene,
+        pp: &ParaProps,
+        run: &Run,
+        scale: f32,
+        k: f32,
+        ink: tiny_skia::Color,
+    ) -> Option<Span> {
         let rp = pp_run(ctx, pp, &run.props);
         let mut size_pt = rp.size.unwrap_or(DEFAULT_FONT_SIZE) as f32 / 100.0 * scale;
         if let Some(b) = rp.baseline.filter(|b| *b != 0) {
@@ -215,10 +285,14 @@ impl Renderer {
                 let [r, g, b, a] = ctx.color(c).to_u8();
                 CColor::rgba(r, g, b, a)
             }
-            Some(Fill::Gradient(g)) => g.stops.first().map(|(_, c)| {
-                let [r, g, b, a] = ctx.color(c).to_u8();
-                CColor::rgba(r, g, b, a)
-            }).unwrap_or(CColor::rgba(0, 0, 0, 255)),
+            Some(Fill::Gradient(g)) => g
+                .stops
+                .first()
+                .map(|(_, c)| {
+                    let [r, g, b, a] = ctx.color(c).to_u8();
+                    CColor::rgba(r, g, b, a)
+                })
+                .unwrap_or(CColor::rgba(0, 0, 0, 255)),
             _ => {
                 let c = ink.to_color_u8();
                 CColor::rgba(c.red(), c.green(), c.blue(), c.alpha())
@@ -247,7 +321,17 @@ impl Renderer {
     /// transformed by `t`). `extra` supplies lowest-priority run defaults
     /// (table headers).
     #[allow(clippy::too_many_arguments)]
-    pub(crate) fn draw_text(&mut self, pm: &mut Pixmap, sc: &Scene, ctx: &Ctx, shape: &Shape, body: &TextBody, x: &Xfrm, t: Transform, extra: Option<RunProps>) {
+    pub(crate) fn draw_text(
+        &mut self,
+        pm: &mut Pixmap,
+        sc: &Scene,
+        ctx: &Ctx,
+        shape: &Shape,
+        body: &TextBody,
+        x: &Xfrm,
+        t: Transform,
+        extra: Option<RunProps>,
+    ) {
         if body.paragraphs.is_empty() || body.is_empty() && body.paragraphs.len() <= 1 {
             return;
         }
@@ -272,7 +356,9 @@ impl Renderer {
         let inner_h_px = (x.h as f32 * kh - (it + ib) * k).max(1.0);
         let wrap = bp.wrap.unwrap_or(true);
         let (scale, line_reduce) = match bp.autofit {
-            Some(AutoFit::Normal { font_scale, line_reduction }) => (font_scale as f32 / 100_000.0, line_reduction as f32 / 100_000.0),
+            Some(AutoFit::Normal { font_scale, line_reduction }) => {
+                (font_scale as f32 / 100_000.0, line_reduction as f32 / 100_000.0)
+            }
             _ => (1.0, 0.0),
         };
         let ink = tiny_skia::Color::BLACK;
@@ -307,13 +393,14 @@ impl Renderer {
                 }
             }
             // Size of an empty paragraph comes from its end properties.
-            let first_size = spans
-                .first()
-                .map(|s| s.size_px)
-                .unwrap_or_else(|| {
-                    let rp = para.end_props.as_ref().map(|e| pp_run(ctx, &pp, e)).unwrap_or_else(|| pp_run(ctx, &pp, &RunProps::default()));
-                    (rp.size.unwrap_or(DEFAULT_FONT_SIZE) as f32 / 100.0 * scale * EMU_PT * k).clamp(1.0, 2000.0)
-                });
+            let first_size = spans.first().map(|s| s.size_px).unwrap_or_else(|| {
+                let rp = para
+                    .end_props
+                    .as_ref()
+                    .map(|e| pp_run(ctx, &pp, e))
+                    .unwrap_or_else(|| pp_run(ctx, &pp, &RunProps::default()));
+                (rp.size.unwrap_or(DEFAULT_FONT_SIZE) as f32 / 100.0 * scale * EMU_PT * k).clamp(1.0, 2000.0)
+            });
             let lh = line_height(&pp.line_spacing, first_size, k);
             let mar_l = pp.mar_l.unwrap_or(0) as f32;
             let indent = pp.indent.unwrap_or(0) as f32;
@@ -334,7 +421,13 @@ impl Renderer {
             buf.set_wrap(if wrap { Wrap::WordOrGlyph } else { Wrap::None });
             buf.set_size(avail, None);
             let align = match pp.align.unwrap_or(Align::Left) {
-                Align::Left => if pp.rtl == Some(true) { CAlign::Right } else { CAlign::Left },
+                Align::Left => {
+                    if pp.rtl == Some(true) {
+                        CAlign::Right
+                    } else {
+                        CAlign::Left
+                    }
+                }
                 Align::Center => CAlign::Center,
                 Align::Right => CAlign::Right,
                 Align::Justify => CAlign::Justified,
@@ -357,7 +450,9 @@ impl Renderer {
                 pp.bullet.as_ref().and_then(|b| bullet_text(b, num)).and_then(|txt| {
                     let first = spans.first()?;
                     let (color, size_pct) = match &pp.bullet {
-                        Some(Bullet::Char { color, size_pct, .. }) | Some(Bullet::AutoNum { color, size_pct, .. }) => (color.clone(), *size_pct),
+                        Some(Bullet::Char { color, size_pct, .. }) | Some(Bullet::AutoNum { color, size_pct, .. }) => {
+                            (color.clone(), *size_pct)
+                        }
                         _ => (None, None),
                     };
                     let mut a = first.attrs.clone();
@@ -386,11 +481,20 @@ impl Renderer {
                     None => 0.0,
                 }
             };
-            paras.push(Para { buf, height, x_off: text_x * k, before: spc(&pp.space_before), after: spc(&pp.space_after), bullet });
+            paras.push(Para {
+                buf,
+                height,
+                x_off: text_x * k,
+                before: spc(&pp.space_before),
+                after: spc(&pp.space_after),
+                bullet,
+            });
         }
 
         // Pass 2: vertical placement.
-        let total: f32 = paras.iter().enumerate().map(|(i, p)| p.height + if i > 0 { p.before } else { 0.0 } + p.after).sum::<f32>() - paras.last().map(|p| p.after).unwrap_or(0.0);
+        let total: f32 =
+            paras.iter().enumerate().map(|(i, p)| p.height + if i > 0 { p.before } else { 0.0 } + p.after).sum::<f32>()
+                - paras.last().map(|p| p.after).unwrap_or(0.0);
         let box_h_px = inner_h_px;
         let mut y = match bp.anchor.unwrap_or(Anchor::Top) {
             Anchor::Top => 0.0,
@@ -447,7 +551,11 @@ impl Renderer {
         let mut h = 0.0f32;
         for para in &body.paragraphs {
             let pp = ctx.para_props(sh, body, para);
-            let size = pp_run(&ctx, &pp, &para.runs.first().map(|r| r.props.clone()).unwrap_or_default()).size.unwrap_or(DEFAULT_FONT_SIZE) as f32 / 100.0 * EMU_PT;
+            let size = pp_run(&ctx, &pp, &para.runs.first().map(|r| r.props.clone()).unwrap_or_default())
+                .size
+                .unwrap_or(DEFAULT_FONT_SIZE) as f32
+                / 100.0
+                * EMU_PT;
             h += line_height(&pp.line_spacing, size, 1.0);
         }
         Some(TextMetrics { width: x.w as f32, height: h })
@@ -471,7 +579,16 @@ fn line_height(spacing: &Option<Spacing>, size_px: f32, k: f32) -> f32 {
 
 /// Draw a shaped buffer into a pixmap at (x, y) with source-over blending.
 #[allow(clippy::too_many_arguments)]
-fn blit_buffer(fonts: &mut FontSystem, swash: &mut SwashCache, buf: &mut Buffer, pm: &mut Pixmap, x: f32, y: f32, w: i32, h: i32) {
+fn blit_buffer(
+    fonts: &mut FontSystem,
+    swash: &mut SwashCache,
+    buf: &mut Buffer,
+    pm: &mut Pixmap,
+    x: f32,
+    y: f32,
+    w: i32,
+    h: i32,
+) {
     let (xi, yi) = (x.round() as i32, y.round() as i32);
     let data = pm.data_mut();
     buf.draw(fonts, swash, CColor::rgba(0, 0, 0, 255), |gx, gy, gw, gh, c| {

@@ -47,29 +47,97 @@ pub struct RunPatch {
 #[derive(Debug, Clone, PartialEq)]
 pub enum Command {
     /// Set transforms (move, resize, rotate) of top-level shapes.
-    SetXfrm { slide: usize, items: Vec<(u32, Xfrm)> },
-    SetFill { slide: usize, ids: Vec<u32>, fill: Option<Fill> },
-    SetLine { slide: usize, ids: Vec<u32>, line: Option<Line> },
+    SetXfrm {
+        slide: usize,
+        items: Vec<(u32, Xfrm)>,
+    },
+    SetFill {
+        slide: usize,
+        ids: Vec<u32>,
+        fill: Option<Fill>,
+    },
+    SetLine {
+        slide: usize,
+        ids: Vec<u32>,
+        line: Option<Line>,
+    },
     /// Replace the text of a shape, keeping the formatting of the first run
     /// of each existing paragraph.
-    SetText { slide: usize, id: u32, text: String },
-    SetRunProps { slide: usize, ids: Vec<u32>, patch: RunPatch },
-    SetAlign { slide: usize, ids: Vec<u32>, align: Align },
-    SetAnchor { slide: usize, ids: Vec<u32>, anchor: Anchor },
-    InsertShapes { slide: usize, shapes: Vec<Shape> },
-    DeleteShapes { slide: usize, ids: Vec<u32> },
-    Reorder { slide: usize, ids: Vec<u32>, how: ZOrder },
-    Group { slide: usize, ids: Vec<u32> },
-    Ungroup { slide: usize, id: u32 },
-    InsertSlide { at: usize, slide: Box<Slide> },
-    DuplicateSlide { index: usize },
-    DeleteSlide { index: usize },
-    MoveSlide { from: usize, to: usize },
-    SetTransition { slides: Vec<usize>, transition: Option<Transition> },
-    SetHidden { slide: usize, hidden: bool },
-    SetBackground { slide: usize, background: Option<Background> },
-    AddMedia { part: String, bytes: Arc<Vec<u8>> },
-    SetSlideSize { w: Emu, h: Emu },
+    SetText {
+        slide: usize,
+        id: u32,
+        text: String,
+    },
+    SetRunProps {
+        slide: usize,
+        ids: Vec<u32>,
+        patch: RunPatch,
+    },
+    SetAlign {
+        slide: usize,
+        ids: Vec<u32>,
+        align: Align,
+    },
+    SetAnchor {
+        slide: usize,
+        ids: Vec<u32>,
+        anchor: Anchor,
+    },
+    InsertShapes {
+        slide: usize,
+        shapes: Vec<Shape>,
+    },
+    DeleteShapes {
+        slide: usize,
+        ids: Vec<u32>,
+    },
+    Reorder {
+        slide: usize,
+        ids: Vec<u32>,
+        how: ZOrder,
+    },
+    Group {
+        slide: usize,
+        ids: Vec<u32>,
+    },
+    Ungroup {
+        slide: usize,
+        id: u32,
+    },
+    InsertSlide {
+        at: usize,
+        slide: Box<Slide>,
+    },
+    DuplicateSlide {
+        index: usize,
+    },
+    DeleteSlide {
+        index: usize,
+    },
+    MoveSlide {
+        from: usize,
+        to: usize,
+    },
+    SetTransition {
+        slides: Vec<usize>,
+        transition: Option<Transition>,
+    },
+    SetHidden {
+        slide: usize,
+        hidden: bool,
+    },
+    SetBackground {
+        slide: usize,
+        background: Option<Background>,
+    },
+    AddMedia {
+        part: String,
+        bytes: Arc<Vec<u8>>,
+    },
+    SetSlideSize {
+        w: Emu,
+        h: Emu,
+    },
 }
 
 impl Command {
@@ -324,7 +392,8 @@ pub fn set_plain_text(body: &mut TextBody, text: &str) {
             }
         }
         let run_tpl = tpl.and_then(|p| p.runs.iter().find(|r| matches!(r.kind, RunKind::Text(_))));
-        let run_props = run_tpl.map(|r| r.props.clone()).or_else(|| tpl.and_then(|p| p.end_props.clone())).unwrap_or_default();
+        let run_props =
+            run_tpl.map(|r| r.props.clone()).or_else(|| tpl.and_then(|p| p.end_props.clone())).unwrap_or_default();
         for (j, seg) in line.split(['\u{2028}', '\u{b}']).enumerate() {
             if j > 0 {
                 para.runs.push(Run { kind: RunKind::Break, props: run_props.clone(), source: None });
@@ -410,8 +479,13 @@ fn reorder(shapes: &mut Vec<Shape>, ids: &[u32], how: ZOrder) {
     }
     match how {
         ZOrder::Front | ZOrder::Back => {
-            let (sel, rest): (Vec<Shape>, Vec<Shape>) = std::mem::take(shapes).into_iter().partition(|s| ids.contains(&s.id));
-            *shapes = if how == ZOrder::Front { rest.into_iter().chain(sel).collect() } else { sel.into_iter().chain(rest).collect() };
+            let (sel, rest): (Vec<Shape>, Vec<Shape>) =
+                std::mem::take(shapes).into_iter().partition(|s| ids.contains(&s.id));
+            *shapes = if how == ZOrder::Front {
+                rest.into_iter().chain(sel).collect()
+            } else {
+                sel.into_iter().chain(rest).collect()
+            };
         }
         ZOrder::Forward => {
             for i in (0..shapes.len().saturating_sub(1)).rev() {
@@ -555,7 +629,15 @@ fn same(a: &Presentation, b: &Presentation) -> bool {
 
 impl History {
     pub fn new(p: Presentation) -> Self {
-        History { current: p, undo: Vec::new(), redo: Vec::new(), coalesce: None, generation: 0, saved_generation: 0, revision: 0 }
+        History {
+            current: p,
+            undo: Vec::new(),
+            redo: Vec::new(),
+            coalesce: None,
+            generation: 0,
+            saved_generation: 0,
+            revision: 0,
+        }
     }
 
     pub fn current(&self) -> &Presentation {

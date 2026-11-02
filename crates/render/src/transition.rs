@@ -1,3 +1,4 @@
+#![cfg_attr(test, allow(clippy::expect_used))]
 //! Slide transitions: pure pixel composition of two rendered slides.
 
 use tiny_skia::{FillRule, Paint, PathBuilder, Pixmap, PixmapPaint, Rect, Transform};
@@ -73,10 +74,18 @@ pub fn compose(from: &Pixmap, to: &Pixmap, kind: &str, dir: Option<&str>, t: f32
             draw(&mut out, from, 0.0, 0.0);
             let rect = if ux != 0.0 {
                 let wv = wf * e;
-                if ux < 0.0 { Rect::from_xywh(wf - wv, 0.0, wv, hf) } else { Rect::from_xywh(0.0, 0.0, wv, hf) }
+                if ux < 0.0 {
+                    Rect::from_xywh(wf - wv, 0.0, wv, hf)
+                } else {
+                    Rect::from_xywh(0.0, 0.0, wv, hf)
+                }
             } else {
                 let hv = hf * e;
-                if uy < 0.0 { Rect::from_xywh(0.0, hf - hv, wf, hv) } else { Rect::from_xywh(0.0, 0.0, wf, hv) }
+                if uy < 0.0 {
+                    Rect::from_xywh(0.0, hf - hv, wf, hv)
+                } else {
+                    Rect::from_xywh(0.0, 0.0, wf, hv)
+                }
             };
             clip_draw(&mut out, to, rect);
         }
@@ -115,7 +124,8 @@ pub fn compose(from: &Pixmap, to: &Pixmap, kind: &str, dir: Option<&str>, t: f32
             } else {
                 draw(&mut out, to, 0.0, 0.0);
                 let s = 1.0 + 0.6 * e;
-                let p = PixmapPaint { opacity: 1.0 - e, quality: tiny_skia::FilterQuality::Bilinear, ..Default::default() };
+                let p =
+                    PixmapPaint { opacity: 1.0 - e, quality: tiny_skia::FilterQuality::Bilinear, ..Default::default() };
                 let tr = Transform::from_translate(wf * (1.0 - s) / 2.0, hf * (1.0 - s) / 2.0).pre_scale(s, s);
                 out.draw_pixmap(0, 0, from.as_ref(), &p, tr, None);
             }

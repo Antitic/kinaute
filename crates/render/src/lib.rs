@@ -4,9 +4,12 @@
 //! cosmic-text (shaping and layout). No GPU is required, so this works on
 //! very old machines; it is also the reference for tests and export.
 
+#![allow(clippy::too_many_arguments, clippy::type_complexity, clippy::field_reassign_with_default)]
+#![cfg_attr(test, allow(clippy::expect_used))]
+
 mod geom;
-mod text;
 pub mod pdf;
+mod text;
 pub mod transition;
 
 pub use text::TextMetrics;
@@ -64,7 +67,13 @@ struct Scene {
 
 impl Renderer {
     pub fn new() -> Self {
-        Renderer { shadows: HashMap::new(), show_prompts: false, cur_k: 1.0, text: text::TextEngine::new(), images: HashMap::new() }
+        Renderer {
+            shadows: HashMap::new(),
+            show_prompts: false,
+            cur_k: 1.0,
+            text: text::TextEngine::new(),
+            images: HashMap::new(),
+        }
     }
 
     /// Render slide `index` at `width` pixels wide (height follows the aspect ratio).
@@ -131,7 +140,15 @@ impl Renderer {
         Some(pm)
     }
 
-    fn draw_shapes(&mut self, pm: &mut Pixmap, sc: &Scene, ctx: &Ctx, shapes: &[Shape], base: Transform, skip_ph: bool) {
+    fn draw_shapes(
+        &mut self,
+        pm: &mut Pixmap,
+        sc: &Scene,
+        ctx: &Ctx,
+        shapes: &[Shape],
+        base: Transform,
+        skip_ph: bool,
+    ) {
         for s in shapes {
             if s.hidden || (skip_ph && s.ph.is_some()) {
                 continue;
@@ -161,7 +178,10 @@ impl Renderer {
                 let geom = sp
                     .geom
                     .clone()
-                    .or_else(|| s.ph.as_ref().and_then(|_| ctx.ph_chain(s).iter().find_map(|c| c.sp().and_then(|p| p.geom.clone()))))
+                    .or_else(|| {
+                        s.ph.as_ref()
+                            .and_then(|_| ctx.ph_chain(s).iter().find_map(|c| c.sp().and_then(|p| p.geom.clone())))
+                    })
                     .unwrap_or_else(|| Geometry::preset("rect"));
                 let open = matches!(&geom, Geometry::Preset { name, .. } if geom::is_open(name))
                     || matches!(s.kind, ShapeKind::Connector(_));
@@ -315,7 +335,16 @@ impl Renderer {
         Some(p)
     }
 
-    fn fill_path(&mut self, pm: &mut Pixmap, ctx: &Ctx, path: &Path, fill: &Fill, ph: Option<&Color>, x: &Xfrm, t: Transform) {
+    fn fill_path(
+        &mut self,
+        pm: &mut Pixmap,
+        ctx: &Ctx,
+        path: &Path,
+        fill: &Fill,
+        ph: Option<&Color>,
+        x: &Xfrm,
+        t: Transform,
+    ) {
         if let Fill::Image(img) = fill {
             let _ = self.fill_image(pm, img, path, x, t);
             return;
@@ -331,7 +360,16 @@ impl Renderer {
         self.fill_path(pm, ctx, &path, fill, ph, x, place(base, x));
     }
 
-    fn stroke_path(&mut self, pm: &mut Pixmap, ctx: &Ctx, path: &Path, line: &Line, ph: Option<&Color>, t: Transform, open: bool) {
+    fn stroke_path(
+        &mut self,
+        pm: &mut Pixmap,
+        ctx: &Ctx,
+        path: &Path,
+        line: &Line,
+        ph: Option<&Color>,
+        t: Transform,
+        open: bool,
+    ) {
         let Some(fill) = &line.fill else { return };
         let Fill::Solid(c) = fill else {
             // Gradient outlines are approximated with their first stop.
@@ -345,7 +383,15 @@ impl Renderer {
         self.stroke_with(pm, path, self.solid(ctx, c, ph), line, t, open);
     }
 
-    fn stroke_with(&mut self, pm: &mut Pixmap, path: &Path, color: tiny_skia::Color, line: &Line, t: Transform, open: bool) {
+    fn stroke_with(
+        &mut self,
+        pm: &mut Pixmap,
+        path: &Path,
+        color: tiny_skia::Color,
+        line: &Line,
+        t: Transform,
+        open: bool,
+    ) {
         // Line widths keep their size inside scaled groups.
         let local = (t.sx * t.sy - t.kx * t.ky).abs().sqrt();
         let width = line.width.unwrap_or(12700).max(1) as f32 * if local > 0.0 { self.cur_k / local } else { 1.0 };
@@ -388,7 +434,16 @@ impl Renderer {
         }
     }
 
-    fn arrow_head(&self, pm: &mut Pixmap, path: &Path, at_end: bool, kind: &str, width: f32, paint: &Paint, t: Transform) {
+    fn arrow_head(
+        &self,
+        pm: &mut Pixmap,
+        path: &Path,
+        at_end: bool,
+        kind: &str,
+        width: f32,
+        paint: &Paint,
+        t: Transform,
+    ) {
         let pts = path.points();
         if pts.len() < 2 {
             return;
@@ -447,7 +502,16 @@ impl Renderer {
         for p in path.clone().transform(t).map(|p| p.points().to_vec()).unwrap_or_default() {
             (((p.x - b.left()) * 4.0).round() as i32, ((p.y - b.top()) * 4.0).round() as i32).hash(&mut hs);
         }
-        (w, h, (blur / 2.0).round() as i32, self.solid(ctx, &sh.color, ph).to_color_u8().red(), self.solid(ctx, &sh.color, ph).to_color_u8().green(), self.solid(ctx, &sh.color, ph).to_color_u8().blue(), (self.solid(ctx, &sh.color, ph).alpha() * 255.0) as u8).hash(&mut hs);
+        (
+            w,
+            h,
+            (blur / 2.0).round() as i32,
+            self.solid(ctx, &sh.color, ph).to_color_u8().red(),
+            self.solid(ctx, &sh.color, ph).to_color_u8().green(),
+            self.solid(ctx, &sh.color, ph).to_color_u8().blue(),
+            (self.solid(ctx, &sh.color, ph).alpha() * 255.0) as u8,
+        )
+            .hash(&mut hs);
         let key = hs.finish();
         let tmp = match self.shadows.get(&key) {
             Some(c) => c.clone(),
@@ -467,13 +531,20 @@ impl Renderer {
                 tmp
             }
         };
-        pm.draw_pixmap(x0 as i32, y0 as i32, tmp.as_ref().as_ref(), &PixmapPaint::default(), Transform::identity(), None);
+        pm.draw_pixmap(
+            x0 as i32,
+            y0 as i32,
+            tmp.as_ref().as_ref(),
+            &PixmapPaint::default(),
+            Transform::identity(),
+            None,
+        );
     }
 
     // ----------------------------------------------------------- images --
 
     fn image_for(&mut self, media: &str, pres_media: &MediaStore, want_w: u32) -> Option<Arc<Pixmap>> {
-        let bucket = (want_w.max(1) + 63) / 64 * 64;
+        let bucket = want_w.max(1).div_ceil(64) * 64;
         let key = (media.to_string(), bucket);
         if let Some(v) = self.images.get(&key) {
             return v.clone();
@@ -540,16 +611,32 @@ impl Renderer {
     // ----------------------------------------------------------- tables --
 
     fn draw_table(&mut self, pm: &mut Pixmap, sc: &Scene, ctx: &Ctx, tbl: &Table, x: &Xfrm, t: Transform) {
-        let col_x: Vec<i64> = std::iter::once(0).chain(tbl.cols.iter().scan(0, |a, w| { *a += w; Some(*a) })).collect();
-        let row_y: Vec<i64> = std::iter::once(0).chain(tbl.rows.iter().scan(0, |a, r| { *a += r.height; Some(*a) })).collect();
-        let dummy = Shape { id: 0, name: String::new(), descr: None, hidden: false, ph: None, xfrm: None, kind: ShapeKind::Opaque { fallback: vec![] }, source: None };
+        let col_x: Vec<i64> = std::iter::once(0)
+            .chain(tbl.cols.iter().scan(0, |a, w| {
+                *a += w;
+                Some(*a)
+            }))
+            .collect();
+        let row_y: Vec<i64> = std::iter::once(0)
+            .chain(tbl.rows.iter().scan(0, |a, r| {
+                *a += r.height;
+                Some(*a)
+            }))
+            .collect();
+        let dummy = Shape {
+            id: 0,
+            name: String::new(),
+            descr: None,
+            hidden: false,
+            ph: None,
+            xfrm: None,
+            kind: ShapeKind::Opaque { fallback: vec![] },
+            source: None,
+        };
         let accent = Color::scheme("accent1");
         let styled = tbl.style_id.is_some() || tbl.first_row || tbl.band_row;
         for (ri, row) in tbl.rows.iter().enumerate() {
-            let mut ci = 0usize;
-            for cell in &row.cells {
-                let this_c = ci;
-                ci += 1;
+            for (this_c, cell) in row.cells.iter().enumerate() {
                 if cell.h_merge || cell.v_merge {
                     continue;
                 }
@@ -569,8 +656,12 @@ impl Renderer {
                     if header {
                         self.fill_path(pm, ctx, &rect, &Fill::Solid(accent.clone()), None, &cell_x, ct);
                     } else {
-                        let tint = if tbl.band_row && (ri - tbl.first_row as usize) % 2 == 0 { 40000 } else { 20000 };
-                        let c = Color { base: kinaute_model::ColorBase::Scheme("accent1".into()), mods: vec![("tint".into(), tint)] };
+                        let tint =
+                            if tbl.band_row && (ri - tbl.first_row as usize).is_multiple_of(2) { 40000 } else { 20000 };
+                        let c = Color {
+                            base: kinaute_model::ColorBase::Scheme("accent1".into()),
+                            mods: vec![("tint".into(), tint)],
+                        };
                         self.fill_path(pm, ctx, &rect, &Fill::Solid(c), None, &cell_x, ct);
                     }
                 }
@@ -579,7 +670,8 @@ impl Renderer {
                     extra.fill = Some(Fill::Solid(Color::scheme("lt1")));
                 }
                 // Borders.
-                let white = Line { width: Some(12700), fill: Some(Fill::Solid(Color::scheme("lt1"))), ..Default::default() };
+                let white =
+                    Line { width: Some(12700), fill: Some(Fill::Solid(Color::scheme("lt1"))), ..Default::default() };
                 let (w, h) = (cell_x.w as f32, cell_x.h as f32);
                 let sides: [(Option<&Line>, [(f32, f32); 2]); 4] = [
                     (cell.borders[0].as_ref(), [(0.0, 0.0), (0.0, h)]),
@@ -616,16 +708,37 @@ impl Renderer {
         let mut p = Paint::default();
         p.set_color_rgba8(0xF2, 0xF2, 0xF2, 0xFF);
         pm.fill_path(&rect, &p, FillRule::Winding, t, None);
-        let line = Line { width: Some(9525), dash: Some("dash".into()), fill: Some(Fill::Solid(Color::srgb("A0A0A0"))), ..Default::default() };
+        let line = Line {
+            width: Some(9525),
+            dash: Some("dash".into()),
+            fill: Some(Fill::Solid(Color::srgb("A0A0A0"))),
+            ..Default::default()
+        };
         self.stroke_path(pm, ctx, &rect, &line, None, t, false);
         let mut tb = TextBody::default();
         tb.body.anchor = Some(Anchor::Middle);
         tb.paragraphs.push(Paragraph {
             props: ParaProps { align: Some(Align::Center), ..Default::default() },
-            runs: vec![Run { props: RunProps { size: Some(1400), fill: Some(Fill::Solid(Color::srgb("707070"))), ..Default::default() }, ..Run::text(label) }],
+            runs: vec![Run {
+                props: RunProps {
+                    size: Some(1400),
+                    fill: Some(Fill::Solid(Color::srgb("707070"))),
+                    ..Default::default()
+                },
+                ..Run::text(label)
+            }],
             ..Default::default()
         });
-        let dummy = Shape { id: 0, name: String::new(), descr: None, hidden: false, ph: None, xfrm: None, kind: ShapeKind::Opaque { fallback: vec![] }, source: None };
+        let dummy = Shape {
+            id: 0,
+            name: String::new(),
+            descr: None,
+            hidden: false,
+            ph: None,
+            xfrm: None,
+            kind: ShapeKind::Opaque { fallback: vec![] },
+            source: None,
+        };
         self.draw_text(pm, sc, ctx, &dummy, &tb, x, t, None);
     }
 

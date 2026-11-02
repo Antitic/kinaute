@@ -125,10 +125,7 @@ pub fn image_of(el: &Element, rd: &Rd) -> ImageFill {
     let media = blip.and_then(|b| b.attr_local("embed").or_else(|| b.attr_local("link"))).and_then(|id| rd.target(id));
     let src = el.child("srcRect");
     let c = |n| src.and_then(|s| num32(s, n)).unwrap_or(0);
-    let alpha = blip
-        .and_then(|b| b.child("alphaModFix"))
-        .and_then(|a| num32(a, "amt"))
-        .unwrap_or(100_000);
+    let alpha = blip.and_then(|b| b.child("alphaModFix")).and_then(|a| num32(a, "amt")).unwrap_or(100_000);
     ImageFill { media, crop: (c("l"), c("t"), c("r"), c("b")), stretch: el.child("tile").is_none(), alpha }
 }
 
@@ -149,7 +146,11 @@ pub fn line_of(ln: &Element, rd: &Rd) -> Line {
 }
 
 pub fn shadow_of(sp_pr_or_effects: &Element) -> Option<Shadow> {
-    let eff = if sp_pr_or_effects.local() == "effectLst" { Some(sp_pr_or_effects) } else { sp_pr_or_effects.child("effectLst") }?;
+    let eff = if sp_pr_or_effects.local() == "effectLst" {
+        Some(sp_pr_or_effects)
+    } else {
+        sp_pr_or_effects.child("effectLst")
+    }?;
     let s = eff.child("outerShdw")?;
     Some(Shadow {
         blur: num(s, "blurRad").unwrap_or(0),
@@ -203,13 +204,19 @@ pub fn geometry_of(sp_pr: &Element) -> Option<Geometry> {
                         sw: cmd.attr("swAng").unwrap_or("0").into(),
                     }),
                     "quadBezTo" => {
-                        let pts: Vec<_> = cmd.children_named("pt").filter_map(|p| Some((p.attr("x")?.to_string(), p.attr("y")?.to_string()))).collect();
+                        let pts: Vec<_> = cmd
+                            .children_named("pt")
+                            .filter_map(|p| Some((p.attr("x")?.to_string(), p.attr("y")?.to_string())))
+                            .collect();
                         if let [a, b] = pts.as_slice() {
                             cmds.push(PathCmd::QuadTo([a.clone(), b.clone()]));
                         }
                     }
                     "cubicBezTo" => {
-                        let pts: Vec<_> = cmd.children_named("pt").filter_map(|p| Some((p.attr("x")?.to_string(), p.attr("y")?.to_string()))).collect();
+                        let pts: Vec<_> = cmd
+                            .children_named("pt")
+                            .filter_map(|p| Some((p.attr("x")?.to_string(), p.attr("y")?.to_string())))
+                            .collect();
                         if let [a, b, c] = pts.as_slice() {
                             cmds.push(PathCmd::CubicTo([a.clone(), b.clone(), c.clone()]));
                         }
@@ -242,10 +249,7 @@ fn style_of(st: &Element) -> Option<StyleRefs> {
         line: r("lnRef"),
         fill: r("fillRef"),
         effect: r("effectRef"),
-        font: (
-            font.and_then(|f| f.attr("idx")).unwrap_or("none").to_string(),
-            font.and_then(color_child),
-        ),
+        font: (font.and_then(|f| f.attr("idx")).unwrap_or("none").to_string(), font.and_then(color_child)),
     })
 }
 
@@ -266,9 +270,10 @@ pub fn run_props_of(r: &Element, rd: &Rd) -> RunProps {
         lang: r.attr("lang").map(str::to_string),
         highlight: r.child("highlight").and_then(color_child),
         outline: r.child("ln").map(|l| line_of(l, rd)),
-        link: r.child("hlinkClick").and_then(|h| h.attr_local("id")).and_then(|id| {
-            rd.rels.iter().find(|x| x.id == id).map(|x| x.target.clone())
-        }),
+        link: r
+            .child("hlinkClick")
+            .and_then(|h| h.attr_local("id"))
+            .and_then(|id| rd.rels.iter().find(|x| x.id == id).map(|x| x.target.clone())),
     }
 }
 
@@ -286,7 +291,12 @@ pub fn para_props_of(p: &Element, rd: &Rd) -> ParaProps {
     let bullet = if p.child("buNone").is_some() {
         Some(Bullet::None)
     } else if let Some(c) = p.child("buChar") {
-        Some(Bullet::Char { ch: c.attr("char").unwrap_or("•").to_string(), font: bu_font, color: bu_color, size_pct: bu_size })
+        Some(Bullet::Char {
+            ch: c.attr("char").unwrap_or("•").to_string(),
+            font: bu_font,
+            color: bu_color,
+            size_pct: bu_size,
+        })
     } else if let Some(a) = p.child("buAutoNum") {
         Some(Bullet::AutoNum {
             scheme: a.attr("type").unwrap_or("arabicPeriod").to_string(),
@@ -323,7 +333,9 @@ pub fn list_style_of(l: &Element, rd: &Rd) -> ListStyle {
         let name = e.local();
         if name == "defPPr" {
             ls.default = Some(para_props_of(e, rd));
-        } else if let Some(n) = name.strip_prefix("lvl").and_then(|r| r.strip_suffix("pPr")).and_then(|n| n.parse::<usize>().ok()) {
+        } else if let Some(n) =
+            name.strip_prefix("lvl").and_then(|r| r.strip_suffix("pPr")).and_then(|n| n.parse::<usize>().ok())
+        {
             if (1..=9).contains(&n) {
                 ls.levels[n - 1] = Some(para_props_of(e, rd));
             }
@@ -406,12 +418,18 @@ fn cnv_pr<'a>(el: &'a Element, nv: &str) -> Option<&'a Element> {
 
 fn placeholder_of(nv: &Element) -> Option<Placeholder> {
     let ph = nv.child("nvPr")?.child("ph")?;
-    Some(Placeholder { kind: ph.attr("type").unwrap_or("obj").to_string(), idx: num(ph, "idx").map(|i| i.max(0) as u32) })
+    Some(Placeholder {
+        kind: ph.attr("type").unwrap_or("obj").to_string(),
+        idx: num(ph, "idx").map(|i| i.max(0) as u32),
+    })
 }
 
 fn table_of(tbl: &Element, rd: &Rd) -> Table {
     let pr = tbl.child("tblPr");
-    let cols = tbl.child("tblGrid").map(|g| g.children_named("gridCol").map(|c| num(c, "w").unwrap_or(0)).collect()).unwrap_or_default();
+    let cols = tbl
+        .child("tblGrid")
+        .map(|g| g.children_named("gridCol").map(|c| num(c, "w").unwrap_or(0)).collect())
+        .unwrap_or_default();
     let rows = tbl
         .children_named("tr")
         .map(|tr| TableRow {
@@ -489,7 +507,11 @@ pub fn shape_of(el: &Element, rd: &Rd) -> Shape {
                 style: el.child("style").and_then(style_of),
                 shadow: pr.and_then(shadow_of),
                 text: el.child("txBody").map(|t| text_body_of(t, rd)),
-                text_box: el.child("nvSpPr").and_then(|n| n.child("cNvSpPr")).and_then(|c| flag(c, "txBox")).unwrap_or(false),
+                text_box: el
+                    .child("nvSpPr")
+                    .and_then(|n| n.child("cNvSpPr"))
+                    .and_then(|c| flag(c, "txBox"))
+                    .unwrap_or(false),
             };
             Shape {
                 id,
@@ -645,10 +667,47 @@ pub fn background_of(csld: &Element, rd: &Rd) -> Option<Background> {
 // -------------------------------------------------------------- transition --
 
 const TRANSITION_KINDS: &[&str] = &[
-    "blinds", "checker", "circle", "dissolve", "comb", "cover", "cut", "diamond", "fade", "newsflash", "plus", "pull",
-    "push", "random", "randomBar", "split", "strips", "wedge", "wheel", "wipe", "zoom", "vortex", "switch", "flip",
-    "ripple", "honeycomb", "prism", "doors", "window", "ferris", "gallery", "conveyor", "pan", "glitter", "warp",
-    "flythrough", "flash", "shred", "reveal", "wheelReverse", "morph",
+    "blinds",
+    "checker",
+    "circle",
+    "dissolve",
+    "comb",
+    "cover",
+    "cut",
+    "diamond",
+    "fade",
+    "newsflash",
+    "plus",
+    "pull",
+    "push",
+    "random",
+    "randomBar",
+    "split",
+    "strips",
+    "wedge",
+    "wheel",
+    "wipe",
+    "zoom",
+    "vortex",
+    "switch",
+    "flip",
+    "ripple",
+    "honeycomb",
+    "prism",
+    "doors",
+    "window",
+    "ferris",
+    "gallery",
+    "conveyor",
+    "pan",
+    "glitter",
+    "warp",
+    "flythrough",
+    "flash",
+    "shred",
+    "reveal",
+    "wheelReverse",
+    "morph",
 ];
 
 pub fn transition_of(sld: &Element) -> Option<Transition> {
@@ -656,14 +715,11 @@ pub fn transition_of(sld: &Element) -> Option<Transition> {
         let el = e.children_named("transition").next()?;
         let effect = el.elements().find(|c| TRANSITION_KINDS.contains(&c.local()));
         let spd = el.attr("spd").unwrap_or("fast");
-        let dur = el
-            .attr_local("dur")
-            .and_then(|d| d.parse::<u32>().ok())
-            .unwrap_or(match spd {
-                "slow" => 1000,
-                "med" => 750,
-                _ => 500,
-            });
+        let dur = el.attr_local("dur").and_then(|d| d.parse::<u32>().ok()).unwrap_or(match spd {
+            "slow" => 1000,
+            "med" => 750,
+            _ => 500,
+        });
         Some(Transition {
             kind: effect.map(|c| c.local().to_string()).unwrap_or_else(|| "none".into()),
             dir: effect.and_then(|c| c.attr("dir").or_else(|| c.attr("orient"))).map(str::to_string),
@@ -698,10 +754,7 @@ pub fn theme_of(root: &Element, part: &str, rd: &Rd) -> Theme {
         }
     }
     let font = |n: &str| {
-        te.and_then(|t| t.path(&["fontScheme", n, "latin"]))
-            .and_then(|l| l.attr("typeface"))
-            .unwrap_or("")
-            .to_string()
+        te.and_then(|t| t.path(&["fontScheme", n, "latin"])).and_then(|l| l.attr("typeface")).unwrap_or("").to_string()
     };
     let fmt = te.and_then(|t| t.child("fmtScheme"));
     let fills = |name: &str| -> Vec<Fill> {
@@ -854,7 +907,11 @@ pub fn open(bytes: &[u8]) -> Result<Opened, PptxError> {
                 background: csld.and_then(|c| background_of(c, &lrd)),
                 shapes: csld.and_then(|c| c.child("spTree")).map(|t| tree_shapes(t, &lrd)).unwrap_or_default(),
                 show_master_shapes: ldoc.root.attr("showMasterSp").map(|v| v != "0" && v != "false").unwrap_or(true),
-                clr_map_override: ldoc.root.child("clrMapOvr").and_then(|c| c.child("overrideClrMapping")).map(clr_map_of),
+                clr_map_override: ldoc
+                    .root
+                    .child("clrMapOvr")
+                    .and_then(|c| c.child("overrideClrMapping"))
+                    .map(clr_map_of),
             }));
         }
     }
@@ -901,7 +958,8 @@ pub fn open(bytes: &[u8]) -> Result<Opened, PptxError> {
         let notes = srels.iter().find(|r| r.ty == REL_NOTES).and_then(|r| {
             let nd = package.xml(&r.target).ok()?;
             let nrels = package.rels_of(&r.target);
-            let shapes = nd.root.child("cSld").and_then(|c| c.child("spTree")).map(|t| tree_shapes(t, &Rd { rels: &nrels }))?;
+            let shapes =
+                nd.root.child("cSld").and_then(|c| c.child("spTree")).map(|t| tree_shapes(t, &Rd { rels: &nrels }))?;
             let texts: Vec<String> = shapes
                 .iter()
                 .filter(|s| s.ph.as_ref().map(|p| p.kind == "body").unwrap_or(false))
@@ -914,7 +972,9 @@ pub fn open(bytes: &[u8]) -> Result<Opened, PptxError> {
         for s in &shapes {
             if let ShapeKind::Frame(f) = &s.kind {
                 match &f.content {
-                    FrameContent::Diagram if f.drawing.is_empty() => report.push(format!("`{spart}`: SmartArt `{}` kept as-is (no drawing to display)", s.name)),
+                    FrameContent::Diagram if f.drawing.is_empty() => {
+                        report.push(format!("`{spart}`: SmartArt `{}` kept as-is (no drawing to display)", s.name))
+                    }
                     FrameContent::Ole => report.push(format!("`{spart}`: embedded object `{}` kept as-is", s.name)),
                     _ => {}
                 }

@@ -5,7 +5,7 @@ use kinaute_model::{CustomGeometry, Geometry, PathCmd};
 use std::collections::HashMap;
 use tiny_skia::{Path, PathBuilder, Rect};
 
-const K: f32 = 0.552_284_75;
+const K: f32 = 0.552_284_8;
 
 fn poly(pts: &[(f32, f32)], close: bool) -> Option<Path> {
     let mut pb = PathBuilder::new();
@@ -89,10 +89,17 @@ pub fn preset(name: &str, adjs: &[(String, i64)], w: f32, h: f32) -> Option<Path
     let ss = w.min(h);
     let a = |n: &str, d: f32| adj(adjs, n, d);
     match name {
-        "rect" | "flowChartProcess" | "flowChartPredefinedProcess" | "flowChartInternalStorage" | "frame" | "textBox"
-        | "wedgeRectCallout" | "borderCallout1" | "snip1Rect" | "snip2SameRect" | "snipRoundRect" => {
-            Some(PathBuilder::from_rect(Rect::from_xywh(0.0, 0.0, w.max(0.01), h.max(0.01))?))
-        }
+        "rect"
+        | "flowChartProcess"
+        | "flowChartPredefinedProcess"
+        | "flowChartInternalStorage"
+        | "frame"
+        | "textBox"
+        | "wedgeRectCallout"
+        | "borderCallout1"
+        | "snip1Rect"
+        | "snip2SameRect"
+        | "snipRoundRect" => Some(PathBuilder::from_rect(Rect::from_xywh(0.0, 0.0, w.max(0.01), h.max(0.01))?)),
         "roundRect" | "wedgeRoundRectCallout" => rounded_rect(w, h, ss * a("adj", 16667.0) / 100_000.0),
         "round1Rect" | "round2SameRect" | "round2DiagRect" => rounded_rect(w, h, ss * a("adj1", 16667.0) / 100_000.0),
         "flowChartTerminator" => rounded_rect(w, h, ss / 2.0),
@@ -142,7 +149,20 @@ pub fn preset(name: &str, adjs: &[(String, i64)], w: f32, h: f32) -> Option<Path
         "plus" | "mathPlus" => {
             let x = ss * a("adj", 25000.0) / 100_000.0;
             poly(
-                &[(x, 0.0), (w - x, 0.0), (w - x, x), (w, x), (w, h - x), (w - x, h - x), (w - x, h), (x, h), (x, h - x), (0.0, h - x), (0.0, x), (x, x)],
+                &[
+                    (x, 0.0),
+                    (w - x, 0.0),
+                    (w - x, x),
+                    (w, x),
+                    (w, h - x),
+                    (w - x, h - x),
+                    (w - x, h),
+                    (x, h),
+                    (x, h - x),
+                    (0.0, h - x),
+                    (0.0, x),
+                    (x, x),
+                ],
                 true,
             )
         }
@@ -195,7 +215,20 @@ pub fn preset(name: &str, adjs: &[(String, i64)], w: f32, h: f32) -> Option<Path
 
 /// Whether a preset is an open line-like shape (stroke only, no fill).
 pub fn is_open(name: &str) -> bool {
-    matches!(name, "line" | "straightConnector1" | "bentConnector2" | "bentConnector3" | "bentConnector4" | "bentConnector5" | "curvedConnector2" | "curvedConnector3" | "curvedConnector4" | "curvedConnector5" | "arc")
+    matches!(
+        name,
+        "line"
+            | "straightConnector1"
+            | "bentConnector2"
+            | "bentConnector3"
+            | "bentConnector4"
+            | "bentConnector5"
+            | "curvedConnector2"
+            | "curvedConnector3"
+            | "curvedConnector4"
+            | "curvedConnector5"
+            | "arc"
+    )
 }
 
 // ------------------------------------------------------------ custom paths --
@@ -261,12 +294,40 @@ pub fn custom(g: &CustomGeometry, w: f32, h: f32, emu_w: f64, emu_h: f64) -> Opt
     let mut vars: HashMap<String, f64> = HashMap::new();
     let (ew, eh) = (emu_w, emu_h);
     for (k, v) in [
-        ("w", ew), ("h", eh), ("l", 0.0), ("t", 0.0), ("r", ew), ("b", eh), ("hc", ew / 2.0), ("vc", eh / 2.0),
-        ("wd2", ew / 2.0), ("hd2", eh / 2.0), ("wd3", ew / 3.0), ("hd3", eh / 3.0), ("wd4", ew / 4.0), ("hd4", eh / 4.0),
-        ("wd5", ew / 5.0), ("hd5", eh / 5.0), ("wd6", ew / 6.0), ("hd6", eh / 6.0), ("wd8", ew / 8.0), ("hd8", eh / 8.0),
-        ("wd10", ew / 10.0), ("hd10", eh / 10.0), ("ss", ew.min(eh)), ("ls", ew.max(eh)), ("ssd2", ew.min(eh) / 2.0),
-        ("ssd4", ew.min(eh) / 4.0), ("ssd8", ew.min(eh) / 8.0), ("cd2", 10_800_000.0), ("cd4", 5_400_000.0),
-        ("cd8", 2_700_000.0), ("3cd4", 16_200_000.0), ("3cd8", 8_100_000.0), ("5cd8", 13_500_000.0), ("7cd8", 18_900_000.0),
+        ("w", ew),
+        ("h", eh),
+        ("l", 0.0),
+        ("t", 0.0),
+        ("r", ew),
+        ("b", eh),
+        ("hc", ew / 2.0),
+        ("vc", eh / 2.0),
+        ("wd2", ew / 2.0),
+        ("hd2", eh / 2.0),
+        ("wd3", ew / 3.0),
+        ("hd3", eh / 3.0),
+        ("wd4", ew / 4.0),
+        ("hd4", eh / 4.0),
+        ("wd5", ew / 5.0),
+        ("hd5", eh / 5.0),
+        ("wd6", ew / 6.0),
+        ("hd6", eh / 6.0),
+        ("wd8", ew / 8.0),
+        ("hd8", eh / 8.0),
+        ("wd10", ew / 10.0),
+        ("hd10", eh / 10.0),
+        ("ss", ew.min(eh)),
+        ("ls", ew.max(eh)),
+        ("ssd2", ew.min(eh) / 2.0),
+        ("ssd4", ew.min(eh) / 4.0),
+        ("ssd8", ew.min(eh) / 8.0),
+        ("cd2", 10_800_000.0),
+        ("cd4", 5_400_000.0),
+        ("cd8", 2_700_000.0),
+        ("3cd4", 16_200_000.0),
+        ("3cd8", 8_100_000.0),
+        ("5cd8", 13_500_000.0),
+        ("7cd8", 18_900_000.0),
     ] {
         vars.insert(k.to_string(), v);
     }
@@ -306,7 +367,8 @@ pub fn custom(g: &CustomGeometry, w: f32, h: f32, emu_w: f64, emu_h: f64) -> Opt
                 }
                 PathCmd::ArcTo { wr, hr, st, sw } => {
                     let (rx, ry) = ((env.val(wr) * sx) as f32, (env.val(hr) * sy) as f32);
-                    let (st, sw) = ((env.val(st) / 60_000.0).to_radians() as f32, (env.val(sw) / 60_000.0).to_radians() as f32);
+                    let (st, sw) =
+                        ((env.val(st) / 60_000.0).to_radians() as f32, (env.val(sw) / 60_000.0).to_radians() as f32);
                     let (cx, cy) = (cur.0 - rx * st.cos(), cur.1 - ry * st.sin());
                     let segs = ((sw.abs() / std::f32::consts::FRAC_PI_2).ceil() as usize).max(1);
                     let step = sw / segs as f32;

@@ -36,10 +36,8 @@ pub fn text_box(id: u32, xfrm: Xfrm, text: &str, size: i32) -> Shape {
 pub fn shape(id: u32, xfrm: Xfrm, preset: &str) -> Shape {
     let mut body = TextBody::default();
     body.body.anchor = Some(Anchor::Middle);
-    body.paragraphs = vec![Paragraph {
-        props: ParaProps { align: Some(Align::Center), ..Default::default() },
-        ..Default::default()
-    }];
+    body.paragraphs =
+        vec![Paragraph { props: ParaProps { align: Some(Align::Center), ..Default::default() }, ..Default::default() }];
     let sp = SpProps {
         geom: Some(Geometry::preset(preset)),
         style: Some(default_style()),
@@ -77,7 +75,10 @@ pub fn picture(id: u32, xfrm: Xfrm, media: &str) -> Shape {
 
 pub fn default_style() -> StyleRefs {
     StyleRefs {
-        line: (2, Some(Color { base: crate::ColorBase::Scheme("accent1".into()), mods: vec![("shade".into(), 15000)] })),
+        line: (
+            2,
+            Some(Color { base: crate::ColorBase::Scheme("accent1".into()), mods: vec![("shade".into(), 15000)] }),
+        ),
         fill: (1, Some(Color::scheme("accent1"))),
         effect: (0, Some(Color::scheme("accent1"))),
         font: ("minor".into(), Some(Color::scheme("lt1"))),

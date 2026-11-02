@@ -348,7 +348,10 @@ fn find_ph<'s>(shapes: &'s [Shape], ph: &Placeholder, master: bool) -> Option<&'
     let phs = || shapes.iter().filter_map(|s| s.ph.as_ref().map(|p| (s, p)));
     if master {
         let k = master_kind(&ph.kind);
-        return phs().find(|(_, p)| master_kind(&p.kind) == k && p.kind == k).or_else(|| phs().find(|(_, p)| master_kind(&p.kind) == k)).map(|(s, _)| s);
+        return phs()
+            .find(|(_, p)| master_kind(&p.kind) == k && p.kind == k)
+            .or_else(|| phs().find(|(_, p)| master_kind(&p.kind) == k))
+            .map(|(s, _)| s);
     }
     // Title-like placeholders match by type; others by index first.
     if ph.is_title() {

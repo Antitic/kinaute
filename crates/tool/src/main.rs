@@ -26,11 +26,30 @@ fn info(path: &str) -> Result<(), String> {
     let bytes = std::fs::read(path).map_err(|e| e.to_string())?;
     let doc = kinaute_pptx::open(&bytes).map_err(|e| e.to_string())?;
     let p = doc.pres();
-    println!("{path}: {} slides, {}x{} EMU, {} layouts, {} masters, {} media", p.slides.len(), p.slide_w, p.slide_h, p.layouts.len(), p.masters.len(), p.media.len());
+    println!(
+        "{path}: {} slides, {}x{} EMU, {} layouts, {} masters, {} media",
+        p.slides.len(),
+        p.slide_w,
+        p.slide_h,
+        p.layouts.len(),
+        p.masters.len(),
+        p.media.len()
+    );
     for (i, s) in p.slides.iter().enumerate() {
         let (sh, pic, op) = count(&s.shapes);
-        let title = s.shapes.iter().find(|x| x.ph.as_ref().map(|p| p.is_title()).unwrap_or(false)).and_then(|x| x.text()).map(|t| t.plain_text()).unwrap_or_default();
-        println!("  {:>3}. {sh} shapes, {pic} pics, {op} opaque, transition={:?}  {}", i + 1, s.transition.as_ref().map(|t| t.kind.as_str()), title.replace('\n', " / "));
+        let title = s
+            .shapes
+            .iter()
+            .find(|x| x.ph.as_ref().map(|p| p.is_title()).unwrap_or(false))
+            .and_then(|x| x.text())
+            .map(|t| t.plain_text())
+            .unwrap_or_default();
+        println!(
+            "  {:>3}. {sh} shapes, {pic} pics, {op} opaque, transition={:?}  {}",
+            i + 1,
+            s.transition.as_ref().map(|t| t.kind.as_str()),
+            title.replace('\n', " / ")
+        );
     }
     for r in &doc.report {
         println!("  ! {r}");
@@ -68,7 +87,12 @@ fn roundtrip(path: &str, out: Option<&str>) -> Result<(), String> {
                 let (xs, ys) = (format!("{x:?}"), format!("{y:?}"));
                 let at = xs.bytes().zip(ys.bytes()).position(|(p, q)| p != q).unwrap_or(0);
                 let lo = at.saturating_sub(150);
-                why = format!("slide {} differs at {at}:\n   A: {}\n   B: {}", i + 1, &xs[lo..(at + 150).min(xs.len())], &ys[lo..(at + 150).min(ys.len())]);
+                why = format!(
+                    "slide {} differs at {at}:\n   A: {}\n   B: {}",
+                    i + 1,
+                    &xs[lo..(at + 150).min(xs.len())],
+                    &ys[lo..(at + 150).min(ys.len())]
+                );
                 break;
             }
         }
@@ -110,17 +134,32 @@ fn demo_edit(path: &str, out: &str) -> Result<(), String> {
     let w = h.current().slide_w;
     let hh = h.current().slide_h;
     e(h.apply(Command::DuplicateSlide { index: 0 }))?;
-    e(h.apply(Command::InsertShapes { slide: 0, shapes: vec![
-        new::text_box(0, Xfrm::new(w / 10, hh / 10, w * 8 / 10, hh / 8), "Édité par Kinaute — été, œuvre & <test>", 3200),
-        new::shape(0, Xfrm::new(w / 10, hh / 2, w / 4, hh / 4), "roundRect"),
-        new::line(0, Xfrm::new(w / 2, hh / 2, w / 4, hh / 4)),
-    ] }))?;
+    e(h.apply(Command::InsertShapes {
+        slide: 0,
+        shapes: vec![
+            new::text_box(
+                0,
+                Xfrm::new(w / 10, hh / 10, w * 8 / 10, hh / 8),
+                "Édité par Kinaute — été, œuvre & <test>",
+                3200,
+            ),
+            new::shape(0, Xfrm::new(w / 10, hh / 2, w / 4, hh / 4), "roundRect"),
+            new::line(0, Xfrm::new(w / 2, hh / 2, w / 4, hh / 4)),
+        ],
+    }))?;
     let first = h.current().slides[0].shapes.iter().find(|s| s.text().is_some()).map(|s| s.id);
     if let Some(id) = first {
         e(h.apply(Command::SetText { slide: 0, id, text: "Titre modifié\nSeconde ligne".into() }))?;
-        e(h.apply(Command::SetRunProps { slide: 0, ids: vec![id], patch: RunPatch { bold: Some(true), color: Some(Color::srgb("C0392B")), ..Default::default() } }))?;
+        e(h.apply(Command::SetRunProps {
+            slide: 0,
+            ids: vec![id],
+            patch: RunPatch { bold: Some(true), color: Some(Color::srgb("C0392B")), ..Default::default() },
+        }))?;
     }
-    e(h.apply(Command::SetTransition { slides: vec![0], transition: Some(Transition { kind: "push".into(), dir: Some("l".into()), ..Default::default() }) }))?;
+    e(h.apply(Command::SetTransition {
+        slides: vec![0],
+        transition: Some(Transition { kind: "push".into(), dir: Some("l".into()), ..Default::default() }),
+    }))?;
     if h.current().slides.len() > 2 {
         e(h.apply(Command::MoveSlide { from: 1, to: 2 }))?;
         e(h.apply(Command::DeleteSlide { index: 3.min(h.current().slides.len() - 1) }))?;
@@ -166,8 +205,125 @@ fn export_pdf(path: &str, out: &str) -> Result<(), String> {
         let jpeg = kinaute_render::pdf::pixmap_to_jpeg(&pm, 88).ok_or("jpeg failed")?;
         pages.push(kinaute_render::pdf::Page { jpeg, width_px: pm.width(), height_px: pm.height() });
     }
-    let pdf = kinaute_render::pdf::write_pdf(&pages, pres.slide_w as f32 / 12700.0, pres.slide_h as f32 / 12700.0, path);
+    let pdf =
+        kinaute_render::pdf::write_pdf(&pages, pres.slide_w as f32 / 12700.0, pres.slide_h as f32 / 12700.0, path);
     std::fs::write(out, pdf).map_err(|e| e.to_string())
+}
+
+/// Corrupt files in many ways; opening and rendering must never panic or hang.
+/// Deterministic (seeded) so failures can be reproduced.
+fn fuzz(files: &[String], rounds: usize) -> usize {
+    let mut seed = 0x9E37_79B9_7F4A_7C15u64;
+    let mut next = move || {
+        seed ^= seed << 13;
+        seed ^= seed >> 7;
+        seed ^= seed << 17;
+        seed
+    };
+    let huge = [
+        "99999999999999",
+        "-99999999999999",
+        "2147483647",
+        "-2147483648",
+        "0",
+        "-1",
+        "4294967296",
+        "1e308",
+        "NaN",
+        "100000000",
+    ];
+    let mut bad = 0;
+    let mut cases = 0usize;
+    let mut opened = 0usize;
+    let mut r = kinaute_render::Renderer::new();
+    for f in files {
+        let Ok(orig) = std::fs::read(f) else { continue };
+        let Ok(pkg) = kinaute_pptx::Package::read(&orig) else { continue };
+        let xml_parts: Vec<String> =
+            pkg.parts.iter().map(|(n, _)| n.clone()).filter(|n| n.starts_with("ppt/") && n.ends_with(".xml")).collect();
+        if xml_parts.is_empty() {
+            continue;
+        }
+        for round in 0..rounds {
+            let mut pkg = pkg.clone();
+            for _ in 0..(1 + next() % 3) {
+                let name = &xml_parts[(next() as usize) % xml_parts.len()];
+                let Some(data) = pkg.get(name) else { continue };
+                let mut d: Vec<u8> = data.as_ref().clone();
+                if d.is_empty() {
+                    continue;
+                }
+                match (round + next() as usize) % 5 {
+                    0 => {
+                        for _ in 0..(1 + next() % 6) {
+                            let i = (next() as usize) % d.len();
+                            d[i] ^= 1 << (next() % 8);
+                        }
+                    }
+                    1 => d.truncate((next() as usize) % d.len()),
+                    2 => {
+                        // Replace a random run of digits with an extreme number.
+                        let digits: Vec<usize> =
+                            d.iter().enumerate().filter(|(_, c)| c.is_ascii_digit()).map(|(i, _)| i).collect();
+                        if !digits.is_empty() {
+                            let start = digits[(next() as usize) % digits.len()];
+                            let mut end = start;
+                            while end < d.len() && d[end].is_ascii_digit() {
+                                end += 1;
+                            }
+                            let v = huge[(next() as usize) % huge.len()].as_bytes().to_vec();
+                            d.splice(start..end, v);
+                        }
+                    }
+                    3 => {
+                        // Swap two tag names or delete a closing tag.
+                        let tags: Vec<usize> =
+                            d.windows(2).enumerate().filter(|(_, w)| w == b"</").map(|(i, _)| i).collect();
+                        if !tags.is_empty() {
+                            let i = tags[(next() as usize) % tags.len()];
+                            let end = d[i..].iter().position(|c| *c == b'>').map(|e| i + e + 1).unwrap_or(d.len());
+                            d.drain(i..end);
+                        }
+                    }
+                    _ => {
+                        // Duplicate a chunk (deeply repeated structure).
+                        let i = (next() as usize) % d.len();
+                        let n = ((next() % 400) as usize).min(d.len() - i);
+                        let chunk = d[i..i + n].to_vec();
+                        for _ in 0..(1 + next() % 20) {
+                            d.splice(i..i, chunk.clone());
+                        }
+                    }
+                }
+                pkg.set(name, std::sync::Arc::new(d));
+            }
+            let Ok(data) = pkg.write() else { continue };
+            cases += 1;
+            let t0 = std::time::Instant::now();
+            let res = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+                if let Ok(doc) = kinaute_pptx::open(&data) {
+                    opened += 1;
+                    r.set_media(doc.pres().media.clone());
+                    for i in 0..doc.pres().slides.len().min(8) {
+                        let _ = r.render_slide(doc.pres(), i, 480);
+                    }
+                    let _ = doc.save_to_bytes();
+                }
+            }));
+            let dt = t0.elapsed();
+            if res.is_err() || dt > std::time::Duration::from_secs(8) {
+                bad += 1;
+                let tag = format!("/tmp/out/fuzzfail-{bad}.pptx");
+                let _ = std::fs::write(&tag, &data);
+                eprintln!(
+                    "{f} round {round}: {} -> {tag}",
+                    if res.is_err() { "PANIC".to_string() } else { format!("SLOW {dt:?}") }
+                );
+            }
+        }
+    }
+    println!("{cases} mutated documents tried, {opened} still opened and were rendered/saved");
+    bad
 }
 
 fn main() -> ExitCode {
@@ -223,6 +379,11 @@ fn main() -> ExitCode {
                 failed += 1;
             }
         },
+        "fuzz" if args.len() >= 4 => {
+            let rounds: usize = args[2].parse().unwrap_or(20);
+            failed += fuzz(&args[3..], rounds);
+            println!("fuzz done, {failed} problem(s)");
+        }
         "check" => {
             let (mut ok, mut skipped) = (0, 0);
             for f in &args[2..] {

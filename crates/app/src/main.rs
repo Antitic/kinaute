@@ -3,7 +3,7 @@
 mod app;
 mod present;
 
-#[allow(unsafe_code)]
+#[allow(unsafe_code, clippy::unwrap_used, clippy::expect_used, clippy::all, clippy::pedantic)]
 mod ui {
     slint::include_modules!();
 }
@@ -109,7 +109,12 @@ impl Shell {
     fn refresh_title(&self) {
         let Some(ui) = self.ui() else { return };
         let a = self.app.borrow();
-        let name = a.path.as_ref().and_then(|p| p.file_name()).map(|n| n.to_string_lossy().to_string()).unwrap_or_else(|| "Sans titre".into());
+        let name = a
+            .path
+            .as_ref()
+            .and_then(|p| p.file_name())
+            .map(|n| n.to_string_lossy().to_string())
+            .unwrap_or_else(|| "Sans titre".into());
         ui.set_doc_title(SharedString::from(format!("{}{} — Kinaute", name, if a.dirty() { " •" } else { "" })));
     }
 
@@ -149,7 +154,10 @@ impl Shell {
         let t = a.current_transition();
         let kind = t.as_ref().map(|t| t.kind.as_str()).unwrap_or("none");
         ui.set_transition_index(self.transition_kinds.iter().position(|k| *k == kind).unwrap_or(0) as i32);
-        ui.set_transition_duration(SharedString::from(format!("{:.1}", t.as_ref().map(|t| t.duration_ms).unwrap_or(700) as f32 / 1000.0)));
+        ui.set_transition_duration(SharedString::from(format!(
+            "{:.1}",
+            t.as_ref().map(|t| t.duration_ms).unwrap_or(700) as f32 / 1000.0
+        )));
         ui.set_advance_on_click(t.as_ref().map(|t| t.advance_on_click).unwrap_or(true));
         ui.set_slide_hidden(a.pres().slides.get(a.cur).map(|s| s.hidden).unwrap_or(false));
         ui.set_tool(SharedString::from(a.tool.as_str()));
@@ -168,7 +176,12 @@ impl Shell {
         for i in 0..n {
             let slide = &a.pres().slides[i];
             let stale = !matches!(thumbs.get(i), Some(Some(s)) if Arc::ptr_eq(s, slide));
-            let item = SlideItem { thumb: self.slides.row_data(i).map(|r| r.thumb).unwrap_or_default(), number: i as i32 + 1, selected: i == a.cur, hidden: slide.hidden };
+            let item = SlideItem {
+                thumb: self.slides.row_data(i).map(|r| r.thumb).unwrap_or_default(),
+                number: i as i32 + 1,
+                selected: i == a.cur,
+                hidden: slide.hidden,
+            };
             if i < self.slides.row_count() {
                 self.slides.set_row_data(i, item);
             } else {
@@ -268,7 +281,9 @@ impl Shell {
     }
 
     fn open_path(&self, path: PathBuf) {
-        let result = std::fs::read(&path).map_err(|e| e.to_string()).and_then(|b| kinaute_pptx::open(&b).map_err(|e| e.to_string()));
+        let result = std::fs::read(&path)
+            .map_err(|e| e.to_string())
+            .and_then(|b| kinaute_pptx::open(&b).map_err(|e| e.to_string()));
         match result {
             Ok(doc) => {
                 let report = doc.report.len();
@@ -338,7 +353,10 @@ impl Shell {
     }
 
     fn save_as(&self) {
-        let start = self.app.borrow().path.as_ref().map(|p| p.display().to_string()).unwrap_or_else(|| format!("{}/presentation.pptx", std::env::var("HOME").unwrap_or_else(|_| ".".into())));
+        let start =
+            self.app.borrow().path.as_ref().map(|p| p.display().to_string()).unwrap_or_else(|| {
+                format!("{}/presentation.pptx", std::env::var("HOME").unwrap_or_else(|_| ".".into()))
+            });
         self.dialog(Pending::SaveAs, "Enregistrer sous…", start);
     }
 
@@ -360,7 +378,12 @@ impl Shell {
             }
         }
         let title = path.file_stem().map(|s| s.to_string_lossy().to_string()).unwrap_or_default();
-        let pdf = kinaute_render::pdf::write_pdf(&pages, pres.slide_w as f32 / EMU_PT as f32, pres.slide_h as f32 / EMU_PT as f32, &title);
+        let pdf = kinaute_render::pdf::write_pdf(
+            &pages,
+            pres.slide_w as f32 / EMU_PT as f32,
+            pres.slide_h as f32 / EMU_PT as f32,
+            &title,
+        );
         let mut path = path;
         if path.extension().is_none() {
             path.set_extension("pdf");
@@ -393,7 +416,7 @@ impl Shell {
                     }
                     s.refresh_all();
                     if let Some(ui) = s.ui() {
-                        let _ = ui.window().set_fullscreen(false);
+                        ui.window().set_fullscreen(false);
                     }
                 }
             });
@@ -406,7 +429,13 @@ impl Shell {
 
     fn apply_geometry(&self) {
         let Some(ui) = self.ui() else { return };
-        let (x, y, w, h, r) = (parse_f(&ui.get_px()), parse_f(&ui.get_py()), parse_f(&ui.get_pw()), parse_f(&ui.get_ph()), parse_f(&ui.get_prot()));
+        let (x, y, w, h, r) = (
+            parse_f(&ui.get_px()),
+            parse_f(&ui.get_py()),
+            parse_f(&ui.get_pw()),
+            parse_f(&ui.get_ph()),
+            parse_f(&ui.get_prot()),
+        );
         self.app.borrow_mut().set_xfrm_of_selection(x, y, w, h, r);
         self.refresh_all();
     }
@@ -451,7 +480,11 @@ impl Shell {
                     return true;
                 }
                 "o" => {
-                    self.dialog(Pending::Open, "Ouvrir…", format!("{}/", std::env::var("HOME").unwrap_or_else(|_| ".".into())));
+                    self.dialog(
+                        Pending::Open,
+                        "Ouvrir…",
+                        format!("{}/", std::env::var("HOME").unwrap_or_else(|_| ".".into())),
+                    );
                     return true;
                 }
                 "n" => {
@@ -505,9 +538,16 @@ impl Shell {
         if !dirty || rev == self.last_autosave_rev.get() {
             return;
         }
-        let dir = std::env::var_os("XDG_CACHE_HOME").map(PathBuf::from).or_else(|| std::env::var_os("HOME").map(|h| PathBuf::from(h).join(".cache"))).map(|d| d.join("kinaute").join("recovery"));
+        let dir = std::env::var_os("XDG_CACHE_HOME")
+            .map(PathBuf::from)
+            .or_else(|| std::env::var_os("HOME").map(|h| PathBuf::from(h).join(".cache")))
+            .map(|d| d.join("kinaute").join("recovery"));
         let Some(dir) = dir else { return };
-        let name = path.as_ref().and_then(|p| p.file_stem()).map(|s| s.to_string_lossy().to_string()).unwrap_or_else(|| "sans-titre".into());
+        let name = path
+            .as_ref()
+            .and_then(|p| p.file_stem())
+            .map(|s| s.to_string_lossy().to_string())
+            .unwrap_or_else(|| "sans-titre".into());
         if std::fs::create_dir_all(&dir).is_ok() {
             if let Ok(bytes) = self.app.borrow().doc.save_to_bytes() {
                 if std::fs::write(dir.join(format!("{name}.recovery.pptx")), bytes).is_ok() {
@@ -523,13 +563,19 @@ thread_local! {
 }
 
 fn run() -> Result<(), slint::PlatformError> {
-    tracing_subscriber::fmt().with_env_filter(tracing_subscriber::EnvFilter::from_default_env()).with_writer(std::io::stderr).init();
+    tracing_subscriber::fmt()
+        .with_env_filter(tracing_subscriber::EnvFilter::from_default_env())
+        .with_writer(std::io::stderr)
+        .init();
     let ui = MainWindow::new()?;
     let renderer = Rc::new(RefCell::new(Renderer::new()));
 
     let arg_path = std::env::args().nth(1).map(PathBuf::from);
     let (doc, path) = match &arg_path {
-        Some(p) => match std::fs::read(p).map_err(|e| e.to_string()).and_then(|b| kinaute_pptx::open(&b).map_err(|e| e.to_string())) {
+        Some(p) => match std::fs::read(p)
+            .map_err(|e| e.to_string())
+            .and_then(|b| kinaute_pptx::open(&b).map_err(|e| e.to_string()))
+        {
             Ok(d) => (d, Some(p.clone())),
             Err(e) => {
                 eprintln!("kinaute: cannot open {}: {e}", p.display());
@@ -539,7 +585,8 @@ fn run() -> Result<(), slint::PlatformError> {
         None => (kinaute_pptx::blank().map_err(|e| slint::PlatformError::Other(e.to_string()))?, None),
     };
     let kinds: Vec<&'static str> = kinaute_render::transition::KINDS.iter().map(|(k, _)| *k).collect();
-    let names: Vec<SharedString> = kinaute_render::transition::KINDS.iter().map(|(_, n)| SharedString::from(*n)).collect();
+    let names: Vec<SharedString> =
+        kinaute_render::transition::KINDS.iter().map(|(_, n)| SharedString::from(*n)).collect();
     ui.set_transition_names(ModelRc::new(VecModel::from(names)));
 
     let slides = Rc::new(VecModel::<SlideItem>::default());
@@ -634,11 +681,18 @@ fn run() -> Result<(), slint::PlatformError> {
 
     // Files.
     on!(on_new_doc, |s| s.new_doc());
-    on!(on_open_doc, |s| s.dialog(Pending::Open, "Ouvrir…", format!("{}/", std::env::var("HOME").unwrap_or_else(|_| ".".into()))));
+    on!(on_open_doc, |s| s.dialog(
+        Pending::Open,
+        "Ouvrir…",
+        format!("{}/", std::env::var("HOME").unwrap_or_else(|_| ".".into()))
+    ));
     on!(on_save_doc, |s| s.save());
     on!(on_save_as, |s| s.save_as());
     on!(on_export_pdf, |s| {
-        let start = s.app.borrow().path.as_ref().map(|p| p.with_extension("pdf").display().to_string()).unwrap_or_else(|| format!("{}/presentation.pdf", std::env::var("HOME").unwrap_or_else(|_| ".".into())));
+        let start =
+            s.app.borrow().path.as_ref().map(|p| p.with_extension("pdf").display().to_string()).unwrap_or_else(|| {
+                format!("{}/presentation.pdf", std::env::var("HOME").unwrap_or_else(|_| ".".into()))
+            });
         s.dialog(Pending::Pdf, "Exporter en PDF…", start);
     });
     on!(on_dialog_accepted, |s, t| {
@@ -659,22 +713,56 @@ fn run() -> Result<(), slint::PlatformError> {
     });
 
     // Edit.
-    on!(on_undo, |s| { s.app.borrow_mut().undo(); s.refresh_all(); });
-    on!(on_redo, |s| { s.app.borrow_mut().redo(); s.refresh_all(); });
+    on!(on_undo, |s| {
+        s.app.borrow_mut().undo();
+        s.refresh_all();
+    });
+    on!(on_redo, |s| {
+        s.app.borrow_mut().redo();
+        s.refresh_all();
+    });
     on!(on_select_tool, |s, t| {
         if t.as_str() == "image" {
-            s.dialog(Pending::Image, "Insérer une image — chemin du fichier", format!("{}/", std::env::var("HOME").unwrap_or_else(|_| ".".into())));
+            s.dialog(
+                Pending::Image,
+                "Insérer une image — chemin du fichier",
+                format!("{}/", std::env::var("HOME").unwrap_or_else(|_| ".".into())),
+            );
             return;
         }
         s.app.borrow_mut().tool = t.to_string();
         s.refresh_inspector();
     });
-    on!(on_add_slide, |s| { s.app.borrow_mut().add_slide(); s.refresh_all(); });
-    on!(on_duplicate_slide, |s| { s.app.borrow_mut().duplicate_slide(); s.refresh_all(); });
-    on!(on_delete_slide, |s| { s.app.borrow_mut().delete_slide(); s.refresh_all(); });
-    on!(on_move_slide, |s, d| { s.app.borrow_mut().move_slide(d); s.refresh_all(); });
-    on!(on_toggle_hidden, |s| { s.app.borrow_mut().toggle_hidden(); s.refresh_all(); });
-    on!(on_pick_slide, |s, i| { s.app.borrow_mut().select_slide(i as usize); s.refresh_all(); });
+    on!(on_add_slide, |s| {
+        s.app.borrow_mut().add_slide();
+        s.refresh_all();
+    });
+    on!(on_duplicate_slide, |s| {
+        s.app.borrow_mut().duplicate_slide();
+        s.refresh_all();
+    });
+    on!(on_delete_slide, |s| {
+        s.app.borrow_mut().delete_slide();
+        s.refresh_all();
+    });
+    on!(on_move_slide, |s, d| {
+        s.app.borrow_mut().move_slide(d);
+        s.refresh_all();
+    });
+    on!(on_toggle_hidden, |s| {
+        s.app.borrow_mut().toggle_hidden();
+        s.refresh_all();
+    });
+    on!(on_slide_dragged, |s, from, rows| {
+        let n = s.app.borrow().slide_count() as i32;
+        let to = (from + rows).clamp(0, n - 1);
+        s.app.borrow_mut().move_slide_to(from as usize, to as usize);
+        s.refresh_all();
+    });
+    on!(on_pick_slide, |s, i| {
+        s.app.borrow_mut().select_slide(i as usize);
+        s.refresh_all();
+    });
     {
         let s = shell.clone();
         ui.on_play(move |from_current| s.play(from_current));
@@ -690,24 +778,56 @@ fn run() -> Result<(), slint::PlatformError> {
     });
     on!(on_font_size_accepted, |s, t| {
         if let Some(v) = parse_f(t.as_str()) {
-            s.app.borrow_mut().patch_run(RunPatch { size: Some((v.clamp(1.0, 999.0) * 100.0) as i32), ..Default::default() });
+            s.app
+                .borrow_mut()
+                .patch_run(RunPatch { size: Some((v.clamp(1.0, 999.0) * 100.0) as i32), ..Default::default() });
             s.refresh_all();
         }
     });
-    on!(on_toggle_bold, |s| { s.app.borrow_mut().toggle_bold(); s.refresh_all(); });
-    on!(on_toggle_italic, |s| { s.app.borrow_mut().toggle_italic(); s.refresh_all(); });
-    on!(on_toggle_underline, |s| { s.app.borrow_mut().toggle_underline(); s.refresh_all(); });
-    on!(on_set_halign, |s, a| { s.app.borrow_mut().set_halign(a); s.refresh_all(); });
-    on!(on_set_valign, |s, a| { s.app.borrow_mut().set_valign(a); s.refresh_all(); });
-    on!(on_text_color, |s, c| {
-        let [r, g, b] = rgb_of(c);
-        s.app.borrow_mut().patch_run(RunPatch { color: Some(kinaute_model::Color::srgb(&kinaute_model::Rgba::from_u8(r, g, b).to_hex())), ..Default::default() });
+    on!(on_toggle_bold, |s| {
+        s.app.borrow_mut().toggle_bold();
         s.refresh_all();
     });
-    on!(on_fill_picked, |s, c| { s.app.borrow_mut().set_fill(Some(rgb_of(c))); s.refresh_all(); });
-    on!(on_no_fill, |s| { s.app.borrow_mut().set_fill(None); s.refresh_all(); });
-    on!(on_line_picked, |s, c| { s.app.borrow_mut().set_line(Some(rgb_of(c)), None); s.refresh_all(); });
-    on!(on_no_line, |s| { s.app.borrow_mut().set_line(None, None); s.refresh_all(); });
+    on!(on_toggle_italic, |s| {
+        s.app.borrow_mut().toggle_italic();
+        s.refresh_all();
+    });
+    on!(on_toggle_underline, |s| {
+        s.app.borrow_mut().toggle_underline();
+        s.refresh_all();
+    });
+    on!(on_set_halign, |s, a| {
+        s.app.borrow_mut().set_halign(a);
+        s.refresh_all();
+    });
+    on!(on_set_valign, |s, a| {
+        s.app.borrow_mut().set_valign(a);
+        s.refresh_all();
+    });
+    on!(on_text_color, |s, c| {
+        let [r, g, b] = rgb_of(c);
+        s.app.borrow_mut().patch_run(RunPatch {
+            color: Some(kinaute_model::Color::srgb(&kinaute_model::Rgba::from_u8(r, g, b).to_hex())),
+            ..Default::default()
+        });
+        s.refresh_all();
+    });
+    on!(on_fill_picked, |s, c| {
+        s.app.borrow_mut().set_fill(Some(rgb_of(c)));
+        s.refresh_all();
+    });
+    on!(on_no_fill, |s| {
+        s.app.borrow_mut().set_fill(None);
+        s.refresh_all();
+    });
+    on!(on_line_picked, |s, c| {
+        s.app.borrow_mut().set_line(Some(rgb_of(c)), None);
+        s.refresh_all();
+    });
+    on!(on_no_line, |s| {
+        s.app.borrow_mut().set_line(None, None);
+        s.refresh_all();
+    });
     on!(on_line_width_accepted, |s, t| {
         if let Some(w) = parse_f(t.as_str()) {
             s.app.borrow_mut().set_line(None, Some(w.clamp(0.0, 100.0)));
@@ -715,11 +835,20 @@ fn run() -> Result<(), slint::PlatformError> {
         }
     });
     on!(on_geometry_accepted, |s| s.apply_geometry());
-    on!(on_arrange, |s, what| { s.app.borrow_mut().arrange(what.as_str()); s.refresh_all(); });
+    on!(on_arrange, |s, what| {
+        s.app.borrow_mut().arrange(what.as_str());
+        s.refresh_all();
+    });
     on!(on_transition_changed, |s| s.apply_transition(false));
     on!(on_apply_transition_all, |s| s.apply_transition(true));
-    on!(on_zoom_fit, |s| { s.app.borrow_mut().zoom_fit(); s.refresh_canvas(); });
-    on!(on_zoom_step, |s, d| { s.app.borrow_mut().zoom_by(if d > 0 { 1.25 } else { 0.8 }, None); s.refresh_canvas(); });
+    on!(on_zoom_fit, |s| {
+        s.app.borrow_mut().zoom_fit();
+        s.refresh_canvas();
+    });
+    on!(on_zoom_step, |s, d| {
+        s.app.borrow_mut().zoom_by(if d > 0 { 1.25 } else { 0.8 }, None);
+        s.refresh_canvas();
+    });
 
     // Background work: thumbnails (a few at a time, never blocking input)
     // and crash-recovery autosave.

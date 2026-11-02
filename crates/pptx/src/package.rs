@@ -160,7 +160,10 @@ impl Package {
             order.sort_by_key(|(n, _)| n != "[Content_Types].xml");
             for (name, data) in order {
                 let ext = name.rsplit('.').next().unwrap_or("").to_ascii_lowercase();
-                let already = matches!(ext.as_str(), "png" | "jpg" | "jpeg" | "gif" | "mp4" | "mp3" | "m4a" | "mov" | "zip" | "wmv" | "webp");
+                let already = matches!(
+                    ext.as_str(),
+                    "png" | "jpg" | "jpeg" | "gif" | "mp4" | "mp3" | "m4a" | "mov" | "zip" | "wmv" | "webp"
+                );
                 zw.start_file(name.as_str(), if already { stored } else { deflate })
                     .map_err(|e| PptxError::Zip(e.to_string()))?;
                 zw.write_all(data)?;
@@ -185,7 +188,8 @@ pub fn dir_of(part: &str) -> String {
 
 /// Resolve a relationship target against the directory of its source.
 pub fn resolve(dir: &str, target: &str) -> String {
-    let mut comps: Vec<&str> = if target.starts_with('/') { Vec::new() } else { dir.split('/').filter(|c| !c.is_empty()).collect() };
+    let mut comps: Vec<&str> =
+        if target.starts_with('/') { Vec::new() } else { dir.split('/').filter(|c| !c.is_empty()).collect() };
     for c in target.split('/') {
         match c {
             "" | "." => {}
@@ -203,7 +207,7 @@ pub fn relative(dir: &str, target: &str) -> String {
     let d: Vec<&str> = dir.split('/').filter(|c| !c.is_empty()).collect();
     let t: Vec<&str> = target.split('/').filter(|c| !c.is_empty()).collect();
     let common = d.iter().zip(&t).take_while(|(a, b)| a == b).count().min(t.len().saturating_sub(1));
-    let mut out: Vec<&str> = std::iter::repeat("..").take(d.len() - common).collect();
+    let mut out: Vec<&str> = std::iter::repeat_n("..", d.len() - common).collect();
     out.extend(&t[common..]);
     out.join("/")
 }
