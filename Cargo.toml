@@ -1,6 +1,6 @@
 [workspace]
 resolver = "2"
-members = ["crates/xml", "crates/model", "crates/pptx", "crates/render", "crates/tool"]
+members = ["crates/xml", "crates/model", "crates/pptx", "crates/render", "crates/tool", "crates/app"]
 
 
 [workspace.package]

@@ -1,0 +1,33 @@
+[package]
+name = "kinaute"
+description = "Kinaute — lightweight presentation editor working directly on .pptx"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+build = "build.rs"
+
+[[bin]]
+name = "kinaute"
+path = "src/main.rs"
+
+[dependencies]
+kinaute-model.workspace = true
+kinaute-pptx.workspace = true
+kinaute-render.workspace = true
+slint = { version = "1.18", default-features = false, features = ["std", "backend-winit", "renderer-software", "software-renderer-systemfonts", "compat-1-2"] }
+tiny-skia.workspace = true
+image.workspace = true
+tracing.workspace = true
+tracing-subscriber.workspace = true
+
+[build-dependencies]
+slint-build = "1.18"
+
+# The Slint-generated code needs `unsafe`; everything we write stays safe
+# (`deny`, with the allowance limited to the generated module).
+[lints.rust]
+unsafe_code = "deny"
+
+[lints.clippy]
+unwrap_used = "deny"
+expect_used = "warn"

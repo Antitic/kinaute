@@ -6,6 +6,8 @@
 
 mod geom;
 mod text;
+pub mod pdf;
+pub mod transition;
 
 pub use text::TextMetrics;
 
@@ -20,8 +22,25 @@ use tiny_skia::{
 
 const EMU_PT: f32 = 12700.0;
 
+/// Which part of a slide to draw (used for fast drag feedback: the static
+/// layers below and above the moving objects are cached by the caller).
+#[derive(Debug, Clone, Copy)]
+pub enum Pass<'a> {
+    /// The whole slide.
+    All,
+    /// Background and everything under the lowest of `ids` (opaque).
+    Below(&'a [u32]),
+    /// Objects above the lowest of `ids`, excluding `ids` (transparent).
+    Above(&'a [u32]),
+    /// Only `ids` (transparent).
+    Only(&'a [u32]),
+}
+
 /// Reusable renderer: owns the font system and image caches.
 pub struct Renderer {
+    shadows: HashMap<u64, Arc<Pixmap>>,
+    /// Editor mode: draw grey prompts in empty placeholders.
+    pub show_prompts: bool,
     /// Device pixels per EMU of the slide being rendered.
     cur_k: f32,
     pub(crate) text: text::TextEngine,
@@ -45,11 +64,16 @@ struct Scene {
 
 impl Renderer {
     pub fn new() -> Self {
-        Renderer { cur_k: 1.0, text: text::TextEngine::new(), images: HashMap::new() }
+        Renderer { shadows: HashMap::new(), show_prompts: false, cur_k: 1.0, text: text::TextEngine::new(), images: HashMap::new() }
     }
 
     /// Render slide `index` at `width` pixels wide (height follows the aspect ratio).
     pub fn render_slide(&mut self, pres: &Presentation, index: usize, width: u32) -> Option<Pixmap> {
+        self.render_pass(pres, index, width, Pass::All)
+    }
+
+    /// Render a part of the slide, see [`Pass`].
+    pub fn render_pass(&mut self, pres: &Presentation, index: usize, width: u32, pass: Pass) -> Option<Pixmap> {
         let slide = pres.slides.get(index)?;
         let width = width.max(16);
         let height = ((width as f64) * pres.slide_h as f64 / pres.slide_w as f64).round().max(1.0) as u32;
@@ -60,15 +84,18 @@ impl Renderer {
         let scene = Scene { k, slide_no: index + 1, slide_count: pres.slides.len() };
 
         let ctx = Ctx::for_slide(pres, slide);
-        // Background.
-        pm.fill(tiny_skia::Color::WHITE);
-        if let Some((fill, ph)) = ctx.background() {
-            let full = Xfrm::new(0, 0, pres.slide_w, pres.slide_h);
-            self.fill_box(&mut pm, &ctx, &fill, ph.as_ref(), &full, base);
+        let with_background = matches!(pass, Pass::All | Pass::Below(_));
+        if with_background {
+            // Background.
+            pm.fill(tiny_skia::Color::WHITE);
+            if let Some((fill, ph)) = ctx.background() {
+                let full = Xfrm::new(0, 0, pres.slide_w, pres.slide_h);
+                self.fill_box(&mut pm, &ctx, &fill, ph.as_ref(), &full, base);
+            }
         }
         // Master and layout decoration.
         let layout = pres.layout_of(slide);
-        if slide.show_master_shapes {
+        if with_background && slide.show_master_shapes {
             if let Some(l) = layout {
                 if l.show_master_shapes {
                     if let Some(m) = pres.master_of_layout(l) {
@@ -80,7 +107,27 @@ impl Renderer {
                 self.draw_shapes(&mut pm, &scene, &lctx, &l.shapes, base, true);
             }
         }
-        self.draw_shapes(&mut pm, &scene, &ctx, &slide.shapes, base, false);
+        let first = |ids: &[u32]| slide.shapes.iter().position(|s| ids.contains(&s.id)).unwrap_or(slide.shapes.len());
+        match pass {
+            Pass::All => self.draw_shapes(&mut pm, &scene, &ctx, &slide.shapes, base, false),
+            Pass::Below(ids) => {
+                let n = first(ids);
+                self.draw_shapes(&mut pm, &scene, &ctx, &slide.shapes[..n], base, false);
+            }
+            Pass::Above(ids) => {
+                let n = first(ids);
+                for s in &slide.shapes[n..] {
+                    if !ids.contains(&s.id) && !s.hidden {
+                        self.draw_shape(&mut pm, &scene, &ctx, s, base);
+                    }
+                }
+            }
+            Pass::Only(ids) => {
+                for s in slide.shapes.iter().filter(|s| ids.contains(&s.id) && !s.hidden) {
+                    self.draw_shape(&mut pm, &scene, &ctx, s, base);
+                }
+            }
+        }
         Some(pm)
     }
 
@@ -133,7 +180,13 @@ impl Renderer {
                     }
                 }
                 if let Some(tb) = &sp.text {
-                    self.draw_text(pm, sc, ctx, s, tb, &x, t, None);
+                    if self.show_prompts && s.ph.is_some() && tb.is_empty() {
+                        if let Some(prompt) = self.prompt_body(ctx, s) {
+                            self.draw_text(pm, sc, ctx, s, &prompt, &x, t, None);
+                        }
+                    } else {
+                        self.draw_text(pm, sc, ctx, s, tb, &x, t, None);
+                    }
                 }
             }
             ShapeKind::Picture(pic) => {
@@ -175,6 +228,27 @@ impl Renderer {
             },
             ShapeKind::Opaque { .. } => {}
         }
+    }
+
+    /// Grey prompt text taken from the layout placeholder (editor only).
+    fn prompt_body(&self, ctx: &Ctx, s: &Shape) -> Option<TextBody> {
+        let ph = s.ph.as_ref()?;
+        if matches!(ph.kind.as_str(), "sldNum" | "dt" | "ftr") {
+            return None;
+        }
+        let mut tb = ctx.layout_ph(ph).and_then(|l| l.text()).cloned()?;
+        if tb.is_empty() {
+            return None;
+        }
+        let grey = Fill::Solid(Color { base: ColorBase::Srgb("8A8A8A".into()), mods: vec![] });
+        for p in &mut tb.paragraphs {
+            for r in &mut p.runs {
+                r.props.fill = Some(grey.clone());
+                r.source = None;
+            }
+        }
+        tb.source_body_pr = None;
+        Some(tb)
     }
 
     // ----------------------------------------------------------- paints --
@@ -366,13 +440,34 @@ impl Renderer {
         if w == 0 || h == 0 || w > 8192 || h > 8192 {
             return;
         }
-        let Some(mut tmp) = Pixmap::new(w, h) else { return };
-        let mut p = Paint::default();
-        p.anti_alias = true;
-        p.set_color(self.solid(ctx, &sh.color, ph));
-        tmp.fill_path(path, &p, FillRule::Winding, t.post_translate(ox - x0, oy - y0), None);
-        box_blur(&mut tmp, (blur / 2.0).round() as usize, 3);
-        pm.draw_pixmap(x0 as i32, y0 as i32, tmp.as_ref(), &PixmapPaint::default(), Transform::identity(), None);
+        // The blurred shadow only depends on the outline's shape, not on its
+        // position, so it is cached and merely translated while dragging.
+        use std::hash::{Hash, Hasher};
+        let mut hs = std::collections::hash_map::DefaultHasher::new();
+        for p in path.clone().transform(t).map(|p| p.points().to_vec()).unwrap_or_default() {
+            (((p.x - b.left()) * 4.0).round() as i32, ((p.y - b.top()) * 4.0).round() as i32).hash(&mut hs);
+        }
+        (w, h, (blur / 2.0).round() as i32, self.solid(ctx, &sh.color, ph).to_color_u8().red(), self.solid(ctx, &sh.color, ph).to_color_u8().green(), self.solid(ctx, &sh.color, ph).to_color_u8().blue(), (self.solid(ctx, &sh.color, ph).alpha() * 255.0) as u8).hash(&mut hs);
+        let key = hs.finish();
+        let tmp = match self.shadows.get(&key) {
+            Some(c) => c.clone(),
+            None => {
+                let Some(mut tmp) = Pixmap::new(w, h) else { return };
+                let mut p = Paint::default();
+                p.anti_alias = true;
+                p.set_color(self.solid(ctx, &sh.color, ph));
+                let origin = t.post_translate(-b.left() + pad, -b.top() + pad);
+                tmp.fill_path(path, &p, FillRule::Winding, origin, None);
+                box_blur(&mut tmp, (blur / 2.0).round() as usize, 3);
+                if self.shadows.len() > 48 {
+                    self.shadows.clear();
+                }
+                let tmp = Arc::new(tmp);
+                self.shadows.insert(key, tmp.clone());
+                tmp
+            }
+        };
+        pm.draw_pixmap(x0 as i32, y0 as i32, tmp.as_ref().as_ref(), &PixmapPaint::default(), Transform::identity(), None);
     }
 
     // ----------------------------------------------------------- images --

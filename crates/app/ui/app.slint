@@ -1,0 +1,606 @@
+import { LineEdit, TextEdit, ComboBox, ScrollView, ListView, Palette, Switch } from "std-widgets.slint";
+
+export struct SlideItem {
+    thumb: image,
+    number: int,
+    selected: bool,
+    hidden: bool,
+}
+
+// Small flat button used throughout the toolbar and inspector.
+component Btn inherits Rectangle {
+    in property <string> text;
+    in property <bool> active: false;
+    in property <bool> enabled: true;
+    in property <length> min-w: 30px;
+    callback clicked;
+    height: 28px;
+    min-width: max(label.preferred-width + 16px, root.min-w);
+    border-radius: 6px;
+    background: !root.enabled ? transparent
+        : ta.pressed ? Palette.alternate-background.darker(0.25)
+        : root.active ? Palette.accent-background
+        : ta.has-hover ? Palette.alternate-background
+        : transparent;
+    accessible-role: button;
+    accessible-label: root.text;
+    accessible-action-default => { root.clicked(); }
+    label := Text {
+        text: root.text;
+        color: !root.enabled ? Palette.foreground.with-alpha(0.35)
+            : root.active ? Palette.accent-foreground
+            : Palette.foreground;
+        horizontal-alignment: center;
+        vertical-alignment: center;
+        font-size: 13px;
+    }
+    ta := TouchArea {
+        enabled: root.enabled;
+        clicked => { root.clicked(); }
+    }
+}
+
+component Sep inherits Rectangle {
+    width: 1px;
+    background: Palette.border;
+}
+
+component Section inherits Text {
+    color: Palette.foreground.with-alpha(0.6);
+    font-size: 11px;
+    font-weight: 700;
+}
+
+component Swatches inherits Rectangle {
+    in property <[color]> colors;
+    callback picked(color);
+    height: ceil(root.colors.length / 8) * 22px;
+    for c[i] in root.colors : Rectangle {
+        x: mod(i, 8) * 24px;
+        y: floor(i / 8) * 22px;
+        width: 20px;
+        height: 20px;
+        background: c;
+        border-width: 1px;
+        border-color: Palette.border;
+        border-radius: 4px;
+        accessible-role: button;
+        TouchArea { clicked => { root.picked(c); } }
+    }
+}
+
+component Field inherits HorizontalLayout {
+    in property <string> label;
+    in-out property <string> value;
+    callback accepted(string);
+    spacing: 6px;
+    Text { text: root.label; width: 18px; vertical-alignment: center; color: Palette.foreground.with-alpha(0.7); font-size: 12px; }
+    LineEdit {
+        text <=> root.value;
+        accepted(t) => { root.accepted(t); }
+        font-size: 12px;
+    }
+}
+
+export component MainWindow inherits Window {
+    title: root.doc-title;
+    preferred-width: 1280px;
+    preferred-height: 800px;
+    min-width: 900px;
+    min-height: 560px;
+    background: Palette.background;
+
+    // ---- state pushed by Rust
+    in property <string> doc-title: "Kinaute";
+    in-out property <image> canvas;
+    in property <[SlideItem]> slides;
+    in property <string> status;
+    in property <bool> can-undo;
+    in property <bool> can-redo;
+    in property <int> slide-count;
+    in property <int> current-slide;
+    in property <string> tool: "select";
+    in property <bool> dialog-open;
+    in property <string> dialog-title;
+    in-out property <string> dialog-text;
+    in property <int> zoom-percent: 100;
+    in property <string> cursor-kind: "default";
+    // selection
+    in property <bool> has-sel;
+    in property <int> sel-count;
+    in property <bool> has-text;
+    in-out property <string> sel-text;
+    in-out property <string> font-size;
+    in property <bool> is-bold;
+    in property <bool> is-italic;
+    in property <bool> is-underline;
+    in property <int> h-align; // 0 left 1 center 2 right 3 justify
+    in property <int> v-align; // 0 top 1 middle 2 bottom
+    in property <color> fill-color;
+    in property <bool> has-fill;
+    in property <color> line-color;
+    in property <bool> has-line;
+    in-out property <string> line-width;
+    in-out property <string> px;
+    in-out property <string> py;
+    in-out property <string> pw;
+    in-out property <string> ph;
+    in-out property <string> prot;
+    in property <bool> is-group;
+    in property <[string]> transition-names;
+    in-out property <int> transition-index;
+    in-out property <string> transition-duration: "0.7";
+    in-out property <bool> advance-on-click: true;
+    in property <bool> slide-hidden;
+    in-out property <int> tab: 0;
+
+    // ---- callbacks to Rust
+    callback canvas-resized(length, length);
+    callback canvas-pressed(length, length, bool, bool);
+    callback canvas-moved(length, length);
+    callback canvas-released(length, length);
+    callback canvas-double-clicked(length, length);
+    callback canvas-scrolled(length, length, length, bool);
+    callback key(string, bool, bool, bool) -> bool;
+    callback new-doc();
+    callback open-doc();
+    callback save-doc();
+    callback save-as();
+    callback export-pdf();
+    callback dialog-accepted(string);
+    callback dialog-cancelled();
+    callback undo();
+    callback redo();
+    callback select-tool(string);
+    callback add-slide();
+    callback duplicate-slide();
+    callback delete-slide();
+    callback move-slide(int);
+    callback toggle-hidden();
+    callback pick-slide(int);
+    callback play(bool);
+    callback text-edited(string);
+    callback font-size-accepted(string);
+    callback toggle-bold();
+    callback toggle-italic();
+    callback toggle-underline();
+    callback set-halign(int);
+    callback set-valign(int);
+    callback text-color(color);
+    callback fill-picked(color);
+    callback no-fill();
+    callback line-picked(color);
+    callback no-line();
+    callback line-width-accepted(string);
+    callback geometry-accepted();
+    callback arrange(string);
+    callback transition-changed();
+    callback apply-transition-all();
+    callback zoom-fit();
+    callback zoom-step(int);
+
+    property <[color]> palette: [
+        #000000, #404040, #7f7f7f, #bfbfbf, #ffffff, #c0392b, #e67e22, #f1c40f,
+        #27ae60, #16a085, #2980b9, #2c3e50, #8e44ad, #d35400, #1abc9c, #95a5a6,
+    ];
+
+    VerticalLayout {
+        // ------------------------------------------------ toolbar
+        Rectangle {
+            height: 46px;
+            background: Palette.alternate-background;
+            HorizontalLayout {
+                padding: 8px;
+                spacing: 4px;
+                alignment: start;
+                Btn { text: @tr("Nouveau"); clicked => { root.new-doc(); } }
+                Btn { text: @tr("Ouvrir"); clicked => { root.open-doc(); } }
+                Btn { text: @tr("Enregistrer"); clicked => { root.save-doc(); } }
+                Btn { text: @tr("PDF"); clicked => { root.export-pdf(); } }
+                Sep { }
+                Btn { text: "↶"; enabled: root.can-undo; accessible-label: @tr("Annuler"); clicked => { root.undo(); } }
+                Btn { text: "↷"; enabled: root.can-redo; accessible-label: @tr("Rétablir"); clicked => { root.redo(); } }
+                Sep { }
+                Btn { text: @tr("+ Diapositive"); clicked => { root.add-slide(); } }
+                Sep { }
+                Btn { text: @tr("Sélection"); active: root.tool == "select"; clicked => { root.select-tool("select"); } }
+                Btn { text: @tr("Texte"); active: root.tool == "text"; clicked => { root.select-tool("text"); } }
+                shapes-btn := Btn {
+                    text: @tr("Formes ▾");
+                    active: root.tool != "select" && root.tool != "text" && root.tool != "image";
+                    clicked => { shapes-popup.show(); }
+                }
+                Btn { text: @tr("Image"); clicked => { root.select-tool("image"); } }
+                Sep { }
+                Btn { text: "−"; accessible-label: @tr("Zoom arrière"); clicked => { root.zoom-step(-1); } }
+                Btn { text: root.zoom-percent + " %"; min-w: 56px; clicked => { root.zoom-fit(); } }
+                Btn { text: "+"; accessible-label: @tr("Zoom avant"); clicked => { root.zoom-step(1); } }
+                Rectangle { horizontal-stretch: 1; }
+                Btn { text: @tr("▶ Diaporama"); active: true; clicked => { root.play(false); } }
+                Btn { text: @tr("▶ Depuis la sélection"); clicked => { root.play(true); } }
+            }
+        }
+
+        HorizontalLayout {
+            // ------------------------------------------------ slide navigator
+            Rectangle {
+                width: 212px;
+                background: Palette.alternate-background.darker(0.04);
+                VerticalLayout {
+                    HorizontalLayout {
+                        padding: 6px;
+                        spacing: 2px;
+                        Btn { text: "⧉"; accessible-label: @tr("Dupliquer la diapositive"); clicked => { root.duplicate-slide(); } }
+                        Btn { text: "🗑"; accessible-label: @tr("Supprimer la diapositive"); clicked => { root.delete-slide(); } }
+                        Btn { text: "▲"; accessible-label: @tr("Monter la diapositive"); clicked => { root.move-slide(-1); } }
+                        Btn { text: "▼"; accessible-label: @tr("Descendre la diapositive"); clicked => { root.move-slide(1); } }
+                        Btn { text: "◌"; active: root.slide-hidden; accessible-label: @tr("Masquer la diapositive"); clicked => { root.toggle-hidden(); } }
+                    }
+                    ListView {
+                        for s in root.slides : Rectangle {
+                            height: 124px;
+                            background: s.selected ? Palette.accent-background.with-alpha(0.25) : transparent;
+                            accessible-role: list-item;
+                            accessible-label: @tr("Diapositive {}", s.number);
+                            Text {
+                                x: 6px; y: 6px; width: 20px;
+                                text: s.number;
+                                color: Palette.foreground.with-alpha(0.6);
+                                font-size: 11px;
+                                horizontal-alignment: right;
+                            }
+                            Rectangle {
+                                x: 32px; y: 6px; width: 168px; height: 112px;
+                                Rectangle {
+                                    x: 0; y: 0;
+                                    width: 168px; height: 112px;
+                                    border-width: s.selected ? 2px : 1px;
+                                    border-color: s.selected ? Palette.accent-background : Palette.border;
+                                    background: white;
+                                    Image {
+                                        source: s.thumb;
+                                        width: parent.width - 2px;
+                                        height: parent.height - 2px;
+                                        image-fit: contain;
+                                        opacity: s.hidden ? 0.35 : 1.0;
+                                    }
+                                }
+                            }
+                            TouchArea { clicked => { root.pick-slide(s.number - 1); } }
+                        }
+                    }
+                }
+            }
+            Sep { }
+
+            // ------------------------------------------------ canvas
+            Rectangle {
+                horizontal-stretch: 1;
+                background: #2b2b2e;
+                clip: true;
+                canvas-area := Rectangle {
+                    width: parent.width;
+                    height: parent.height;
+                    changed width => { root.canvas-resized(self.width, self.height); }
+                    changed height => { root.canvas-resized(self.width, self.height); }
+                    Image {
+                        source: root.canvas;
+                        width: parent.width;
+                        height: parent.height;
+                        image-fit: fill;
+                    }
+                    canvas-fs := FocusScope {
+                        key-pressed(e) => {
+                            if (root.key(e.text, e.modifiers.control || e.modifiers.meta, e.modifiers.shift, e.modifiers.alt)) {
+                                return accept;
+                            }
+                            return reject;
+                        }
+                        touch := TouchArea {
+                            mouse-cursor: root.cursor-kind == "ns" ? MouseCursor.ns-resize
+                                : root.cursor-kind == "ew" ? MouseCursor.ew-resize
+                                : root.cursor-kind == "nwse" ? MouseCursor.nwse-resize
+                                : root.cursor-kind == "nesw" ? MouseCursor.nesw-resize
+                                : root.cursor-kind == "rotate" ? MouseCursor.crosshair
+                                : root.tool != "select" ? MouseCursor.crosshair
+                                : MouseCursor.default;
+                            pointer-event(ev) => {
+                                if (ev.button == PointerEventButton.left) {
+                                    if (ev.kind == PointerEventKind.down) {
+                                        canvas-fs.focus();
+                                        root.canvas-pressed(self.mouse-x, self.mouse-y, ev.modifiers.shift, ev.modifiers.control || ev.modifiers.meta);
+                                    } else if (ev.kind == PointerEventKind.up) {
+                                        root.canvas-released(self.mouse-x, self.mouse-y);
+                                    }
+                                }
+                            }
+                            moved => { root.canvas-moved(self.mouse-x, self.mouse-y); }
+                            double-clicked => { root.canvas-double-clicked(self.mouse-x, self.mouse-y); }
+                            scroll-event(ev) => {
+                                root.canvas-scrolled(self.mouse-x, self.mouse-y, ev.delta-y, ev.modifiers.control || ev.modifiers.meta);
+                                accept
+                            }
+                        }
+                    }
+                }
+            }
+            Sep { }
+
+            // ------------------------------------------------ inspector
+            Rectangle {
+                width: 292px;
+                background: Palette.alternate-background.darker(0.04);
+                VerticalLayout {
+                    HorizontalLayout {
+                        padding: 6px;
+                        spacing: 2px;
+                        Btn { text: @tr("Format"); active: root.tab == 0; clicked => { root.tab = 0; } }
+                        Btn { text: @tr("Texte"); active: root.tab == 1; clicked => { root.tab = 1; } }
+                        Btn { text: @tr("Disposition"); active: root.tab == 2; clicked => { root.tab = 2; } }
+                        Btn { text: @tr("Animation"); active: root.tab == 3; clicked => { root.tab = 3; } }
+                    }
+                    ScrollView {
+                        VerticalLayout {
+                            width: 276px;
+                            padding: 12px;
+                            spacing: 8px;
+                            alignment: start;
+
+                            if root.tab == 0 : VerticalLayout {
+                                spacing: 8px;
+                                if !root.has-sel : Text {
+                                    text: @tr("Sélectionnez un objet pour modifier son format.");
+                                    wrap: word-wrap;
+                                    color: Palette.foreground.with-alpha(0.6);
+                                }
+                                if root.has-sel : VerticalLayout {
+                                    spacing: 8px;
+                                    Section { text: @tr("REMPLISSAGE"); }
+                                    Swatches { colors: root.palette; picked(c) => { root.fill-picked(c); } }
+                                    HorizontalLayout {
+                                        spacing: 6px;
+                                        Btn { text: @tr("Aucun"); active: !root.has-fill; clicked => { root.no-fill(); } }
+                                        Rectangle {
+                                            width: 28px; height: 28px; border-radius: 6px;
+                                            background: root.has-fill ? root.fill-color : transparent;
+                                            border-width: 1px; border-color: Palette.border;
+                                        }
+                                    }
+                                    Section { text: @tr("CONTOUR"); }
+                                    Swatches { colors: root.palette; picked(c) => { root.line-picked(c); } }
+                                    HorizontalLayout {
+                                        spacing: 6px;
+                                        Btn { text: @tr("Aucun"); active: !root.has-line; clicked => { root.no-line(); } }
+                                        Field { label: "pt"; value <=> root.line-width; accepted(t) => { root.line-width-accepted(t); } }
+                                    }
+                                }
+                            }
+
+                            if root.tab == 1 : VerticalLayout {
+                                spacing: 8px;
+                                if !root.has-text : Text {
+                                    text: @tr("Sélectionnez une forme ou une zone de texte.");
+                                    wrap: word-wrap;
+                                    color: Palette.foreground.with-alpha(0.6);
+                                }
+                                if root.has-text : VerticalLayout {
+                                    spacing: 8px;
+                                    Section { text: @tr("CONTENU"); }
+                                    TextEdit {
+                                        height: 110px;
+                                        text <=> root.sel-text;
+                                        edited(t) => { root.text-edited(t); }
+                                        accessible-label: @tr("Texte de l'objet");
+                                    }
+                                    Section { text: @tr("POLICE"); }
+                                    HorizontalLayout {
+                                        spacing: 4px;
+                                        Field { label: "pt"; value <=> root.font-size; accepted(t) => { root.font-size-accepted(t); } }
+                                        Btn { text: "G"; active: root.is-bold; accessible-label: @tr("Gras"); clicked => { root.toggle-bold(); } }
+                                        Btn { text: "I"; active: root.is-italic; accessible-label: @tr("Italique"); clicked => { root.toggle-italic(); } }
+                                        Btn { text: "S"; active: root.is-underline; accessible-label: @tr("Souligné"); clicked => { root.toggle-underline(); } }
+                                    }
+                                    Swatches { colors: root.palette; picked(c) => { root.text-color(c); } }
+                                    Section { text: @tr("ALIGNEMENT"); }
+                                    HorizontalLayout {
+                                        spacing: 2px;
+                                        Btn { text: "⇤"; active: root.h-align == 0; accessible-label: @tr("Aligner à gauche"); clicked => { root.set-halign(0); } }
+                                        Btn { text: "↔"; active: root.h-align == 1; accessible-label: @tr("Centrer"); clicked => { root.set-halign(1); } }
+                                        Btn { text: "⇥"; active: root.h-align == 2; accessible-label: @tr("Aligner à droite"); clicked => { root.set-halign(2); } }
+                                        Btn { text: "☰"; active: root.h-align == 3; accessible-label: @tr("Justifier"); clicked => { root.set-halign(3); } }
+                                        Rectangle { width: 8px; }
+                                        Btn { text: "⤒"; active: root.v-align == 0; accessible-label: @tr("Haut"); clicked => { root.set-valign(0); } }
+                                        Btn { text: "↕"; active: root.v-align == 1; accessible-label: @tr("Milieu"); clicked => { root.set-valign(1); } }
+                                        Btn { text: "⤓"; active: root.v-align == 2; accessible-label: @tr("Bas"); clicked => { root.set-valign(2); } }
+                                    }
+                                }
+                            }
+
+                            if root.tab == 2 : VerticalLayout {
+                                spacing: 8px;
+                                if !root.has-sel : Text {
+                                    text: @tr("Sélectionnez un objet pour le positionner.");
+                                    wrap: word-wrap;
+                                    color: Palette.foreground.with-alpha(0.6);
+                                }
+                                if root.has-sel : VerticalLayout {
+                                    spacing: 8px;
+                                    Section { text: @tr("POSITION (cm)"); }
+                                    HorizontalLayout { spacing: 8px;
+                                        Field { label: "X"; value <=> root.px; accepted(t) => { root.geometry-accepted(); } }
+                                        Field { label: "Y"; value <=> root.py; accepted(t) => { root.geometry-accepted(); } }
+                                    }
+                                    HorizontalLayout { spacing: 8px;
+                                        Field { label: "L"; value <=> root.pw; accepted(t) => { root.geometry-accepted(); } }
+                                        Field { label: "H"; value <=> root.ph; accepted(t) => { root.geometry-accepted(); } }
+                                    }
+                                    Field { label: "°"; value <=> root.prot; accepted(t) => { root.geometry-accepted(); } }
+                                    Section { text: @tr("ORDRE"); }
+                                    HorizontalLayout { spacing: 2px;
+                                        Btn { text: @tr("Premier plan"); clicked => { root.arrange("front"); } }
+                                        Btn { text: @tr("Arrière-plan"); clicked => { root.arrange("back"); } }
+                                    }
+                                    HorizontalLayout { spacing: 2px;
+                                        Btn { text: @tr("Avancer"); clicked => { root.arrange("forward"); } }
+                                        Btn { text: @tr("Reculer"); clicked => { root.arrange("backward"); } }
+                                    }
+                                    Section { text: @tr("ALIGNER"); }
+                                    HorizontalLayout { spacing: 2px;
+                                        Btn { text: "⇤"; accessible-label: @tr("Aligner à gauche"); clicked => { root.arrange("al"); } }
+                                        Btn { text: "↔"; accessible-label: @tr("Centrer horizontalement"); clicked => { root.arrange("ac"); } }
+                                        Btn { text: "⇥"; accessible-label: @tr("Aligner à droite"); clicked => { root.arrange("ar"); } }
+                                        Btn { text: "⤒"; accessible-label: @tr("Aligner en haut"); clicked => { root.arrange("at"); } }
+                                        Btn { text: "↕"; accessible-label: @tr("Centrer verticalement"); clicked => { root.arrange("am"); } }
+                                        Btn { text: "⤓"; accessible-label: @tr("Aligner en bas"); clicked => { root.arrange("ab"); } }
+                                    }
+                                    HorizontalLayout { spacing: 2px;
+                                        Btn { text: @tr("Répartir H"); enabled: root.sel-count > 2; clicked => { root.arrange("dh"); } }
+                                        Btn { text: @tr("Répartir V"); enabled: root.sel-count > 2; clicked => { root.arrange("dv"); } }
+                                    }
+                                    Section { text: @tr("GROUPE"); }
+                                    HorizontalLayout { spacing: 2px;
+                                        Btn { text: @tr("Grouper"); enabled: root.sel-count > 1; clicked => { root.arrange("group"); } }
+                                        Btn { text: @tr("Dissocier"); enabled: root.is-group; clicked => { root.arrange("ungroup"); } }
+                                    }
+                                }
+                            }
+
+                            if root.tab == 3 : VerticalLayout {
+                                spacing: 8px;
+                                Section { text: @tr("TRANSITION DE LA DIAPOSITIVE"); }
+                                ComboBox {
+                                    model: root.transition-names;
+                                    current-index <=> root.transition-index;
+                                    selected(v) => { root.transition-changed(); }
+                                    accessible-label: @tr("Transition");
+                                }
+                                Field { label: "s"; value <=> root.transition-duration; accepted(t) => { root.transition-changed(); } }
+                                Switch {
+                                    text: @tr("Avancer au clic");
+                                    checked <=> root.advance-on-click;
+                                    toggled => { root.transition-changed(); }
+                                }
+                                HorizontalLayout { spacing: 2px;
+                                    Btn { text: @tr("Appliquer à toutes les diapositives"); clicked => { root.apply-transition-all(); } }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        // ------------------------------------------------ status bar
+        Rectangle {
+            height: 24px;
+            background: Palette.alternate-background;
+            HorizontalLayout {
+                padding-left: 10px;
+                padding-right: 10px;
+                Text { text: root.status; vertical-alignment: center; font-size: 12px; color: Palette.foreground.with-alpha(0.75); }
+                Rectangle { horizontal-stretch: 1; }
+                Text { text: @tr("Diapositive") + " " + (root.slide-count > 0 ? root.current-slide + 1 : 0) + " / " + root.slide-count; vertical-alignment: center; font-size: 12px; color: Palette.foreground.with-alpha(0.75); }
+            }
+        }
+    }
+
+    shapes-popup := PopupWindow {
+        x: 330px;
+        y: 44px;
+        width: 232px;
+        Rectangle {
+            background: Palette.background;
+            border-width: 1px;
+            border-color: Palette.border;
+            border-radius: 8px;
+            VerticalLayout {
+                padding: 8px;
+                spacing: 2px;
+                for entry in [
+                    { id: "rect", name: @tr("Rectangle") },
+                    { id: "roundRect", name: @tr("Rectangle arrondi") },
+                    { id: "ellipse", name: @tr("Ellipse") },
+                    { id: "triangle", name: @tr("Triangle") },
+                    { id: "diamond", name: @tr("Losange") },
+                    { id: "rightArrow", name: @tr("Flèche") },
+                    { id: "star5", name: @tr("Étoile") },
+                    { id: "hexagon", name: @tr("Hexagone") },
+                    { id: "heart", name: @tr("Cœur") },
+                    { id: "line", name: @tr("Ligne") },
+                ] : Btn {
+                    text: entry.name;
+                    clicked => { root.select-tool(entry.id); }
+                }
+            }
+        }
+    }
+
+    // ------------------------------------------------ modal dialog (paths)
+    if root.dialog-open : Rectangle {
+        background: #000000a0;
+        TouchArea { }
+        Rectangle {
+            width: min(560px, parent.width - 40px);
+            height: 150px;
+            background: Palette.background;
+            border-radius: 10px;
+            border-width: 1px;
+            border-color: Palette.border;
+            VerticalLayout {
+                padding: 16px;
+                spacing: 10px;
+                Text { text: root.dialog-title; font-weight: 700; }
+                dialog-edit := LineEdit {
+                    text <=> root.dialog-text;
+                    accepted(t) => { root.dialog-accepted(t); }
+                    accessible-label: root.dialog-title;
+                }
+                HorizontalLayout {
+                    alignment: end;
+                    spacing: 8px;
+                    Btn { text: @tr("Annuler"); clicked => { root.dialog-cancelled(); } }
+                    Btn { text: @tr("OK"); active: true; clicked => { root.dialog-accepted(root.dialog-text); } }
+                }
+            }
+        }
+        init => { dialog-edit.focus(); }
+    }
+}
+
+// Full-screen presentation window.
+export component PresentWindow inherits Window {
+    in property <image> frame;
+    callback next();
+    callback prev();
+    callback first();
+    callback last();
+    callback exit();
+    callback resized(length, length);
+    no-frame: false;
+    full-screen: true;
+    background: black;
+    title: "Kinaute";
+    changed width => { root.resized(self.width, self.height); }
+    changed height => { root.resized(self.width, self.height); }
+    Image {
+        source: root.frame;
+        width: parent.width;
+        height: parent.height;
+        image-fit: contain;
+    }
+    fs := FocusScope {
+        key-pressed(e) => {
+            if (e.text == Key.Escape || e.text == "q") { root.exit(); return accept; }
+            if (e.text == Key.RightArrow || e.text == Key.DownArrow || e.text == Key.PageDown || e.text == " " || e.text == "\n") { root.next(); return accept; }
+            if (e.text == Key.LeftArrow || e.text == Key.UpArrow || e.text == Key.PageUp || e.text == Key.Backspace) { root.prev(); return accept; }
+            if (e.text == Key.Home) { root.first(); return accept; }
+            if (e.text == Key.End) { root.last(); return accept; }
+            reject
+        }
+        TouchArea {
+            mouse-cursor: MouseCursor.default;
+            clicked => { root.next(); }
+        }
+    }
+    init => { fs.focus(); }
+}

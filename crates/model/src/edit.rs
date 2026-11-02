@@ -533,11 +533,29 @@ pub struct History {
     /// Number of edits since the last save (negative after undo past it).
     generation: u64,
     saved_generation: u64,
+    /// Bumped on every change of the current document (edit, undo or redo).
+    revision: u64,
+}
+
+/// Cheap document equality: shared (`Arc`) parts are compared by pointer
+/// first, so a one-slide edit never walks the whole presentation.
+fn same(a: &Presentation, b: &Presentation) -> bool {
+    fn arcs<T: PartialEq>(x: &[Arc<T>], y: &[Arc<T>]) -> bool {
+        x.len() == y.len() && x.iter().zip(y).all(|(p, q)| Arc::ptr_eq(p, q) || **p == **q)
+    }
+    a.slide_w == b.slide_w
+        && a.slide_h == b.slide_h
+        && arcs(&a.slides, &b.slides)
+        && arcs(&a.layouts, &b.layouts)
+        && arcs(&a.masters, &b.masters)
+        && arcs(&a.themes, &b.themes)
+        && Arc::ptr_eq(&a.default_text, &b.default_text)
+        && (Arc::ptr_eq(&a.media, &b.media) || a.media.len() == b.media.len())
 }
 
 impl History {
     pub fn new(p: Presentation) -> Self {
-        History { current: p, undo: Vec::new(), redo: Vec::new(), coalesce: None, generation: 0, saved_generation: 0 }
+        History { current: p, undo: Vec::new(), redo: Vec::new(), coalesce: None, generation: 0, saved_generation: 0, revision: 0 }
     }
 
     pub fn current(&self) -> &Presentation {
@@ -554,9 +572,10 @@ impl History {
     pub fn apply_coalesced(&mut self, cmd: Command, key: Option<u64>) -> Result<(), EditError> {
         let mut next = self.current.clone();
         cmd.apply(&mut next)?;
-        if next == self.current {
+        if same(&next, &self.current) {
             return Ok(());
         }
+        self.revision += 1;
         let merge = key.is_some() && key == self.coalesce && !self.undo.is_empty();
         let prev = std::mem::replace(&mut self.current, next);
         if !merge {
@@ -593,6 +612,7 @@ impl History {
                 let cur = std::mem::replace(&mut self.current, prev);
                 self.redo.push((label, cur));
                 self.generation = self.generation.wrapping_sub(1);
+                self.revision += 1;
                 true
             }
             None => false,
@@ -606,10 +626,16 @@ impl History {
                 let cur = std::mem::replace(&mut self.current, next);
                 self.undo.push((label, cur));
                 self.generation = self.generation.wrapping_add(1);
+                self.revision += 1;
                 true
             }
             None => false,
         }
+    }
+
+    /// Changes whenever the current document changes.
+    pub fn revision(&self) -> u64 {
+        self.revision
     }
 
     pub fn mark_saved(&mut self) {

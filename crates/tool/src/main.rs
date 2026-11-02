@@ -150,6 +150,26 @@ fn render(path: &str, out: &str, width: u32) -> Result<(), String> {
     Ok(())
 }
 
+/// Export all (non-hidden) slides to a raster PDF.
+fn export_pdf(path: &str, out: &str) -> Result<(), String> {
+    let bytes = std::fs::read(path).map_err(|e| e.to_string())?;
+    let doc = kinaute_pptx::open(&bytes).map_err(|e| e.to_string())?;
+    let pres = doc.pres();
+    let mut r = kinaute_render::Renderer::new();
+    r.set_media(pres.media.clone());
+    let mut pages = Vec::new();
+    for i in 0..pres.slides.len() {
+        if pres.slides[i].hidden {
+            continue;
+        }
+        let pm = r.render_slide(pres, i, 1600).ok_or("render failed")?;
+        let jpeg = kinaute_render::pdf::pixmap_to_jpeg(&pm, 88).ok_or("jpeg failed")?;
+        pages.push(kinaute_render::pdf::Page { jpeg, width_px: pm.width(), height_px: pm.height() });
+    }
+    let pdf = kinaute_render::pdf::write_pdf(&pages, pres.slide_w as f32 / 12700.0, pres.slide_h as f32 / 12700.0, path);
+    std::fs::write(out, pdf).map_err(|e| e.to_string())
+}
+
 fn main() -> ExitCode {
     let args: Vec<String> = std::env::args().collect();
     let Some(cmd) = args.get(1) else {
@@ -185,6 +205,24 @@ fn main() -> ExitCode {
                 failed += 1;
             }
         }
+        "pdf" if args.len() == 4 => {
+            if let Err(e) = export_pdf(&args[2], &args[3]) {
+                eprintln!("{}: FAIL {e}", args[2]);
+                failed += 1;
+            }
+        }
+        "new" if args.len() == 3 => match kinaute_pptx::blank().and_then(|d| d.save_to_bytes()) {
+            Ok(b) => {
+                if let Err(e) = std::fs::write(&args[2], b) {
+                    eprintln!("{e}");
+                    failed += 1;
+                }
+            }
+            Err(e) => {
+                eprintln!("FAIL {e}");
+                failed += 1;
+            }
+        },
         "check" => {
             let (mut ok, mut skipped) = (0, 0);
             for f in &args[2..] {
